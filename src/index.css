@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+@theme {
+  /* Surfaces & text (Facebook CRM palette) */
+  --color-page: #f2f4f7;
+  --color-surface: #ffffff;
+  --color-surface-2: #f4f5f7;
+  --color-ink: #1c2b33;
+  --color-ink-2: #5b6b73;
+  --color-ink-3: #8a98a0;
+  --color-line: #e5e8eb;
+  --color-line-2: #d4d9dc;
+
+  /* Brand blue */
+  --color-brand: #185fa5;
+  --color-brand-dark: #0c447c;
+  --color-brand-soft: #e6f1fb;
+  --color-brand-border: #85b7eb;
+
+  /* Status / badge tones */
+  --color-tone-gray-bg: #f1efe8;
+  --color-tone-gray-tx: #444441;
+  --color-tone-blue-bg: #e6f1fb;
+  --color-tone-blue-tx: #0c447c;
+  --color-tone-amber-bg: #faeeda;
+  --color-tone-amber-tx: #633806;
+  --color-tone-green-bg: #eaf3de;
+  --color-tone-green-tx: #27500a;
+  --color-tone-red-bg: #fcebeb;
+  --color-tone-red-tx: #791f1f;
+  --color-tone-purple-bg: #eeedfe;
+  --color-tone-purple-tx: #3c3489;
+
+  /* Avatar tones */
+  --color-av-blue-bg: #e6f1fb;
+  --color-av-blue-tx: #0c447c;
+  --color-av-teal-bg: #e1f5ee;
+  --color-av-teal-tx: #085041;
+  --color-av-purple-bg: #eeedfe;
+  --color-av-purple-tx: #3c3489;
+
+  /* Demo alert */
+  --color-alert-bg: #faeeda;
+  --color-alert-border: #ef9f27;
+  --color-alert-tx: #633806;
+  --color-alert-sub: #854f0b;
+
+  --radius-md: 6px;
+  --radius-lg: 10px;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-page);
+  color: var(--color-ink);
+  font-size: 13px;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
