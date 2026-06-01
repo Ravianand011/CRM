@@ -19,25 +19,28 @@ Express server that receives Facebook Lead Ads webhooks, fetches lead details fr
    - `VERIFY_TOKEN`
    - `FB_APP_SECRET`
    - `FB_PAGE_ACCESS_TOKEN`
-6. Railway auto-deploys; get URL from Settings → Networking → Generate Domain
-7. Update Facebook Webhook Callback URL with Railway URL
+6. Railway auto-deploys; public domain: `https://crm-production-be3b.up.railway.app`
+7. Update Facebook Webhook Callback URL (see below)
+
+> **Note:** `crm.railway.internal` is private Railway networking only. Facebook and your browser must use the **public** domain above, not `.railway.internal`.
 
 ## Facebook Webhook Setup
 
 1. [developers.facebook.com](https://developers.facebook.com) → Your App → Webhooks
 2. Select product: **Page**
-3. Callback URL: `https://your-railway-url.up.railway.app/webhook`
-4. Verify token: (same as `VERIFY_TOKEN` in `.env`)
+3. Callback URL: `https://crm-production-be3b.up.railway.app/webhook`
+4. Verify token: (same as `VERIFY_TOKEN` in Railway variables / `.env`)
 5. Subscribe to field: **leadgen**
 6. Save
 
 ## Test
 
 ```bash
-curl -X POST https://your-railway-url.up.railway.app/test-lead
-curl https://your-railway-url.up.railway.app/leads
+curl https://crm-production-be3b.up.railway.app/health
+curl -X POST https://crm-production-be3b.up.railway.app/test-lead
+curl https://crm-production-be3b.up.railway.app/leads
 ```
 
 ## CRM Integration
 
-Set `VITE_WEBHOOK_URL` in the CRM root `.env` to your Railway URL (or `http://localhost:3000` locally). The CRM polls `GET /leads` every 30 seconds.
+Root `.env` sets `VITE_WEBHOOK_URL=https://crm-production-be3b.up.railway.app`. For local webhook testing, `.env.development` points to `http://localhost:3000` when you run `npm run dev`.

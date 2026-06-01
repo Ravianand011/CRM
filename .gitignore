@@ -15,6 +15,7 @@ dist-ssr
 # Environment and webhook data
 .env
 .env.local
+.env.development.local
 leads.json
 failed-leads.json
 
