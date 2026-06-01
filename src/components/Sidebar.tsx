@@ -23,7 +23,7 @@ interface SidebarProps {
   onNavigate: (view: View) => void;
   onNewLead: () => void;
   onExport: () => void;
-  onSyncFacebook?: () => void;
+  onRefreshLeads?: () => void;
 }
 
 type BadgeTone = 'red' | 'green';
@@ -91,7 +91,7 @@ export function Sidebar({
   onNavigate,
   onNewLead,
   onExport,
-  onSyncFacebook,
+  onRefreshLeads,
 }: SidebarProps) {
   return (
     <aside className="flex h-full w-[210px] shrink-0 flex-col border-r border-line bg-surface py-4">
@@ -136,13 +136,13 @@ export function Sidebar({
         >
           <Plus size={15} /> New Lead
         </button>
-        {onSyncFacebook && (
+        {onRefreshLeads && (
           <button
             type="button"
-            onClick={() => void onSyncFacebook()}
+            onClick={() => void onRefreshLeads()}
             className="flex w-full items-center justify-center gap-2 rounded-md border border-line-2 px-3 py-2 text-[12px] font-medium text-ink-2 hover:bg-surface-2"
           >
-            <RefreshCw size={14} /> Sync Facebook
+            <RefreshCw size={14} /> Refresh leads
           </button>
         )}
         <button
