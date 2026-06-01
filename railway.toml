@@ -1,13 +1,10 @@
-# Monorepo: CRM frontend + webhook-server. This service runs the Facebook webhook API only.
-# If you deploy the Vite CRM as a separate Railway service, set that service's root to "/" with its own config.
+# Dockerfile build — no Nixpacks/Caddy. Root Directory should be "/" (repo root).
 
 [build]
-builder = "nixpacks"
-buildCommand = "npm install --prefix webhook-server"
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
 
 [deploy]
-# Works when Root Directory is "/" (repo root)
-startCommand = "npm start --prefix webhook-server"
 healthcheckPath = "/health"
 healthcheckTimeout = 100
 restartPolicyType = "ON_FAILURE"
