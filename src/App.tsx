@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Lead } from './types/Lead';
 import type { View } from './types/navigation';
 import { useLeads } from './hooks/useLeads';
+import { useWebhookSync } from './hooks/useWebhookSync';
 import { useNotifications } from './hooks/useNotifications';
 import { useFollowUpScheduler } from './hooks/useFollowUpScheduler';
 import { buildQueue } from './utils/scheduler';
@@ -23,10 +24,20 @@ const TITLES: Record<View, string> = {
 };
 
 function App() {
-  const { leads, loading, mode, switchMode, save, importRows, backup } =
+  const { leads, loading, mode, switchMode, save, importRows, backup, refresh } =
     useLeads();
+  useWebhookSync(refresh);
   const { reminders, count } = useNotifications(leads);
   const { now } = useFollowUpScheduler();
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ count: number }>).detail;
+      alert(`${detail.count} new Facebook leads received!`);
+    };
+    window.addEventListener('newLeadsReceived', handler);
+    return () => window.removeEventListener('newLeadsReceived', handler);
+  }, []);
 
   const [view, setView] = useState<View>('dashboard');
   const [search, setSearch] = useState('');

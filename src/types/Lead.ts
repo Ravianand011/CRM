@@ -41,6 +41,8 @@ export interface Lead {
   missedCallCount: number; // increments when not_picked/switch_off repeats
   hiddenUntil?: string; // ISO datetime - don't show before this
   permanentlyHidden: boolean; // true if not_interested after demo_scheduled
+
+  fbLeadId?: string; // Facebook leadgen id when synced from webhook
 }
 
 export const LEAD_STATUSES: LeadStatus[] = [

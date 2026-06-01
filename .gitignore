@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Environment and webhook data
+.env
+.env.local
+leads.json
+failed-leads.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
