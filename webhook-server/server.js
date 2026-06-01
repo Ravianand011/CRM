@@ -29,34 +29,7 @@ const FIELD_MAP = {
 };
 
 app.use(cors({ origin: '*' }));
-app.use(
-  express.json({
-    verify: (req, _res, buf) => {
-      req.rawBody = buf;
-    },
-  }),
-);
-
-function verifySignature(req) {
-  const signature = req.get('X-Hub-Signature-256');
-  if (!signature || !process.env.FB_APP_SECRET) return false;
-
-  const expected =
-    'sha256=' +
-    crypto
-      .createHmac('sha256', process.env.FB_APP_SECRET)
-      .update(req.rawBody)
-      .digest('hex');
-
-  try {
-    return crypto.timingSafeEqual(
-      Buffer.from(signature),
-      Buffer.from(expected),
-    );
-  } catch {
-    return false;
-  }
-}
+app.use(express.json());
 
 function flattenFieldData(fieldData) {
   const result = {};
@@ -118,7 +91,26 @@ function saveLead(lead) {
   return true;
 }
 
-/** Required when Facebook app has "Require app secret" enabled. */
+function createTestLead() {
+  const now = new Date().toISOString();
+  return {
+    id: `fb_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    name: 'Test User',
+    phone: '9999999999',
+    email: 'test@test.com',
+    city: 'Delhi',
+    qualification: 'B.Tech',
+    whenPlanningToJoin: 'Within 1 month',
+    source: 'facebook',
+    status: 'not_picked',
+    missedCallCount: 0,
+    permanentlyHidden: false,
+    createdAt: now,
+    updatedAt: now,
+    callHistory: [],
+  };
+}
+
 function getAppSecretProof(accessToken) {
   const secret = process.env.FB_APP_SECRET;
   if (!secret || !accessToken) return null;
@@ -155,12 +147,6 @@ async function graphGet(url) {
   const data = await res.json();
   if (!res.ok) {
     const msg = data.error?.message || JSON.stringify(data);
-    if (msg.includes('Bad signature')) {
-      throw new Error(
-        'Bad signature: FB_APP_SECRET must match your Facebook app (App settings → Basic). ' +
-          'Use a Page access token with leads_retrieval permission.',
-      );
-    }
     throw new Error(msg);
   }
   return data;
@@ -181,9 +167,6 @@ async function syncAllLeadsFromFacebook() {
   const token = process.env.FB_PAGE_ACCESS_TOKEN;
   if (!token) {
     throw new Error('FB_PAGE_ACCESS_TOKEN not set in Railway variables');
-  }
-  if (!process.env.FB_APP_SECRET) {
-    throw new Error('FB_APP_SECRET not set in Railway variables');
   }
 
   let pageId = process.env.FB_PAGE_ID;
@@ -232,16 +215,37 @@ async function syncAllLeadsFromFacebook() {
 async function fetchLeadFromFacebook(leadgenId) {
   const token = process.env.FB_PAGE_ACCESS_TOKEN;
   if (!token) {
-    console.error('FB_PAGE_ACCESS_TOKEN not set');
+    console.error('fetchLeadFromFacebook: FB_PAGE_ACCESS_TOKEN not set');
     return;
   }
 
+  const url = graphApiUrl(leadgenId, {
+    fields: 'id,created_time,field_data,ad_name,campaign_name',
+  });
+
+  console.log('fetchLeadFromFacebook URL:', url);
+
   try {
-    const data = await graphGet(
-      graphApiUrl(leadgenId, {
-        fields: 'id,created_time,field_data,ad_name,campaign_name',
-      }),
-    );
+    const res = await fetch(url);
+    const rawText = await res.text();
+    console.log('fetchLeadFromFacebook raw response:', rawText);
+
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch (parseErr) {
+      console.error('fetchLeadFromFacebook: invalid JSON response', parseErr.message);
+      return;
+    }
+
+    if (!res.ok || data.error) {
+      console.error(
+        'fetchLeadFromFacebook API error:',
+        data.error?.message || data.error || `HTTP ${res.status}`,
+      );
+      return;
+    }
+
     saveLead(buildLeadFromGraphRow(data));
   } catch (err) {
     console.error('fetchLeadFromFacebook error:', err.message);
@@ -250,11 +254,10 @@ async function fetchLeadFromFacebook(leadgenId) {
 
 // Facebook webhook verification
 app.get('/webhook', (req, res) => {
-  const mode = req.query['hub.mode'];
-  const token = req.query['hub.verify_token'];
+  const verifyToken = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
 
-  if (mode === 'subscribe' && token === process.env.VERIFY_TOKEN) {
+  if (verifyToken === process.env.VERIFY_TOKEN) {
     console.log('Webhook verified!');
     return res.status(200).send(challenge);
   }
@@ -262,17 +265,12 @@ app.get('/webhook', (req, res) => {
   res.sendStatus(403);
 });
 
-// Receive Facebook lead events
+// Receive Facebook lead events (no signature validation)
 app.post('/webhook', (req, res) => {
   res.sendStatus(200);
 
-  if (!verifySignature(req)) {
-    console.error('Invalid X-Hub-Signature-256');
-    return;
-  }
-
   const body = req.body;
-  if (!body.entry) return;
+  if (!body || !body.entry) return;
 
   for (const entry of body.entry) {
     if (!entry.changes) continue;
@@ -284,12 +282,10 @@ app.post('/webhook', (req, res) => {
   }
 });
 
-// CRM polls this endpoint
 app.get('/leads', (_req, res) => {
   res.json(leadsStore);
 });
 
-// Pull all historical leads from Facebook Lead Ads forms
 app.post('/sync-facebook', async (_req, res) => {
   try {
     const result = await syncAllLeadsFromFacebook();
@@ -300,31 +296,18 @@ app.post('/sync-facebook', async (_req, res) => {
   }
 });
 
-// Add a test lead without Facebook
-app.post('/test-lead', (_req, res) => {
-  const now = new Date().toISOString();
-  const testLead = {
-    id: `fb_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    name: 'Test User',
-    phone: '9999999999',
-    email: 'test@test.com',
-    city: 'Delhi',
-    qualification: 'B.Tech',
-    whenPlanningToJoin: 'Within 1 month',
-    source: 'facebook',
-    status: 'not_picked',
-    missedCallCount: 0,
-    permanentlyHidden: false,
-    createdAt: now,
-    updatedAt: now,
-    callHistory: [],
-  };
+// Fake lead without Facebook API (GET)
+app.get('/test-lead', (_req, res) => {
+  saveLead(createTestLead());
+  res.json({ success: true });
+});
 
-  saveLead(testLead);
+// Fake lead without Facebook API (POST — backward compatible)
+app.post('/test-lead', (_req, res) => {
+  saveLead(createTestLead());
   res.json({ success: true, message: 'Test lead added' });
 });
 
-// Health check for Railway
 app.get('/health', (_req, res) => {
   res.json({
     status: 'ok',
@@ -334,7 +317,6 @@ app.get('/health', (_req, res) => {
   });
 });
 
-// CRM dashboard (Vite build in /dist) — same origin as /leads API
 const distPath = path.join(__dirname, 'dist');
 const indexHtml = path.join(distPath, 'index.html');
 const hasDashboard = fs.existsSync(indexHtml);
@@ -351,7 +333,6 @@ if (hasDashboard) {
   app.get('/', (_req, res) => {
     res.status(503).json({
       error: 'CRM dashboard not built',
-      hint: 'Deploy from repo root with root Dockerfile (Root Directory must be /, not webhook-server)',
       api: { health: '/health', leads: '/leads', webhook: '/webhook' },
     });
   });
@@ -361,7 +342,5 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server started on port ${PORT}`);
   if (hasDashboard) {
     console.log('CRM dashboard served from /dist');
-  } else {
-    console.warn('WARNING: /dist/index.html missing — API only, no dashboard');
   }
 });
