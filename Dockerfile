@@ -1,5 +1,5 @@
-# Stage 1: Build CRM dashboard (Vite)
-FROM node:18-alpine AS crm-build
+# Stage 1: Build CRM dashboard (Vite 7 requires Node 20.19+)
+FROM node:22-alpine AS crm-build
 
 WORKDIR /crm
 
@@ -17,7 +17,7 @@ ENV VITE_WEBHOOK_URL=${VITE_WEBHOOK_URL}
 RUN npm run build
 
 # Stage 2: Webhook API + static CRM
-FROM node:18-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
