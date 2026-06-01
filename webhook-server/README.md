@@ -11,16 +11,27 @@ Express server that receives Facebook Lead Ads webhooks, fetches lead details fr
 
 ## Railway Deployment
 
+Railway must run **Node** (`node server.js`), not Caddy/static. If deploy logs show Caddy on port 8080, the CRM frontend was deployed by mistake.
+
+**Option A (recommended):** Service **Settings → Root Directory** = `webhook-server`  
+**Config file path:** `/webhook-server/railway.json`  
+**Start command:** leave empty (uses `npm start` → `node server.js`)
+
+**Option B:** Root Directory = `/` (repo root)  
+**Config file path:** `/railway.toml`  
+**Start command:** `npm start --prefix webhook-server` (or `node server.js` via root [`server.js`](../server.js) shim)
+
 1. Push to GitHub
 2. Go to [railway.app](https://railway.app) → New Project → Deploy from GitHub
 3. Select this repo
-4. Set **Root Directory** to `webhook-server`
+4. Apply Option A or B above
 5. Add environment variables in Railway dashboard:
    - `VERIFY_TOKEN`
    - `FB_APP_SECRET`
    - `FB_PAGE_ACCESS_TOKEN`
-6. Railway auto-deploys; public domain: `https://crm-production-be3b.up.railway.app`
-7. Update Facebook Webhook Callback URL (see below)
+6. Redeploy; deploy logs should show `Server started on port …` (not Caddy)
+7. Public domain: `https://crm-production-be3b.up.railway.app`
+8. Update Facebook Webhook Callback URL (see below)
 
 > **Note:** `crm.railway.internal` is private Railway networking only. Facebook and your browser must use the **public** domain above, not `.railway.internal`.
 

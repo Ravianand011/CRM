@@ -1,0 +1,8 @@
+# Force Node.js webhook server — do not treat repo root as a Vite static site (Caddy).
+providers = ["node"]
+
+[phases.install]
+cmds = ["npm install --prefix webhook-server"]
+
+[start]
+cmd = "npm start --prefix webhook-server"
