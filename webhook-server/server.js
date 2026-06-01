@@ -118,11 +118,49 @@ function saveLead(lead) {
   return true;
 }
 
+/** Required when Facebook app has "Require app secret" enabled. */
+function getAppSecretProof(accessToken) {
+  const secret = process.env.FB_APP_SECRET;
+  if (!secret || !accessToken) return null;
+  return crypto
+    .createHmac('sha256', secret)
+    .update(accessToken)
+    .digest('hex');
+}
+
+function graphApiUrl(path, query = {}) {
+  const token = process.env.FB_PAGE_ACCESS_TOKEN;
+  if (!token) throw new Error('FB_PAGE_ACCESS_TOKEN not set');
+  const params = new URLSearchParams();
+  Object.entries(query).forEach(([k, v]) => params.set(k, String(v)));
+  params.set('access_token', token);
+  const proof = getAppSecretProof(token);
+  if (proof) params.set('appsecret_proof', proof);
+  return `https://graph.facebook.com/v19.0/${path}?${params}`;
+}
+
+function withAppSecretProof(url) {
+  const token = process.env.FB_PAGE_ACCESS_TOKEN;
+  const proof = getAppSecretProof(token);
+  if (!proof) return url;
+  const u = new URL(url);
+  if (!u.searchParams.has('appsecret_proof')) {
+    u.searchParams.set('appsecret_proof', proof);
+  }
+  return u.toString();
+}
+
 async function graphGet(url) {
-  const res = await fetch(url);
+  const res = await fetch(withAppSecretProof(url));
   const data = await res.json();
   if (!res.ok) {
     const msg = data.error?.message || JSON.stringify(data);
+    if (msg.includes('Bad signature')) {
+      throw new Error(
+        'Bad signature: FB_APP_SECRET must match your Facebook app (App settings → Basic). ' +
+          'Use a Page access token with leads_retrieval permission.',
+      );
+    }
     throw new Error(msg);
   }
   return data;
@@ -130,11 +168,11 @@ async function graphGet(url) {
 
 async function fetchAllPages(firstUrl) {
   const items = [];
-  let url = firstUrl;
+  let url = withAppSecretProof(firstUrl);
   while (url) {
     const data = await graphGet(url);
     if (Array.isArray(data.data)) items.push(...data.data);
-    url = data.paging?.next || null;
+    url = data.paging?.next ? withAppSecretProof(data.paging.next) : null;
   }
   return items;
 }
@@ -144,17 +182,21 @@ async function syncAllLeadsFromFacebook() {
   if (!token) {
     throw new Error('FB_PAGE_ACCESS_TOKEN not set in Railway variables');
   }
+  if (!process.env.FB_APP_SECRET) {
+    throw new Error('FB_APP_SECRET not set in Railway variables');
+  }
 
   let pageId = process.env.FB_PAGE_ID;
   if (!pageId) {
-    const me = await graphGet(
-      `https://graph.facebook.com/v19.0/me?fields=id&access_token=${token}`,
-    );
+    const me = await graphGet(graphApiUrl('me', { fields: 'id' }));
     pageId = me.id;
   }
 
   const forms = await fetchAllPages(
-    `https://graph.facebook.com/v19.0/${pageId}/leadgen_forms?fields=id,name&limit=100&access_token=${token}`,
+    graphApiUrl(`${pageId}/leadgen_forms`, {
+      fields: 'id,name',
+      limit: '100',
+    }),
   );
 
   let added = 0;
@@ -162,7 +204,10 @@ async function syncAllLeadsFromFacebook() {
 
   for (const form of forms) {
     const rows = await fetchAllPages(
-      `https://graph.facebook.com/v19.0/${form.id}/leads?fields=id,created_time,field_data&limit=100&access_token=${token}`,
+      graphApiUrl(`${form.id}/leads`, {
+        fields: 'id,created_time,field_data',
+        limit: '100',
+      }),
     );
     for (const row of rows) {
       const lead = buildLeadFromGraphRow(row);
@@ -191,13 +236,12 @@ async function fetchLeadFromFacebook(leadgenId) {
     return;
   }
 
-  const url =
-    `https://graph.facebook.com/v19.0/${leadgenId}` +
-    `?fields=id,created_time,field_data,ad_name,campaign_name` +
-    `&access_token=${token}`;
-
   try {
-    const data = await graphGet(url);
+    const data = await graphGet(
+      graphApiUrl(leadgenId, {
+        fields: 'id,created_time,field_data,ad_name,campaign_name',
+      }),
+    );
     saveLead(buildLeadFromGraphRow(data));
   } catch (err) {
     console.error('fetchLeadFromFacebook error:', err.message);

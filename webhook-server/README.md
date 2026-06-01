@@ -48,7 +48,13 @@ If you see `Cannot GET /`, Railway is using the API-only image (no `dist/`). Fix
 
 `POST /sync-facebook` fetches every lead from all Lead Ad forms on your Page (historical + new). The CRM calls this on load and has a **Sync Facebook** button in the sidebar.
 
-Required Railway variable: `FB_PAGE_ACCESS_TOKEN` with `leads_retrieval` permission.
+Required Railway variables:
+
+- `FB_PAGE_ACCESS_TOKEN` — **Page** token (not User/App token) with `leads_retrieval`
+- `FB_APP_SECRET` — from App settings → Basic (must match the app that owns the token)
+- `VERIFY_TOKEN` — for webhook verification
+
+If sync fails with **Bad signature**, `FB_APP_SECRET` is wrong or missing. In Facebook App → Settings → Advanced, if **Require app secret** is ON, both secret and `appsecret_proof` (added automatically) are required.
 
 Optional: `FB_PAGE_ID` (otherwise detected from the token).
 
