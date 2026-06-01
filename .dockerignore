@@ -4,10 +4,4 @@ dist
 .git
 .env
 .env.*
-*.md
-src
-public
-index.html
-vite.config.ts
-tsconfig*.json
-eslint.config.js
+**/.env

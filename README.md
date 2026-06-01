@@ -1,6 +1,6 @@
 # Lead CRM
 
-A browser-only CRM dashboard for managing sales leads. Built with React + TypeScript + Vite + Tailwind CSS. All data is stored in the browser's `localStorage` — there is **no backend, database, or server** required.
+A CRM dashboard for managing sales leads. Built with React + TypeScript + Vite + Tailwind CSS. Lead data is stored in the browser's `localStorage`. Facebook Lead Ads sync via a webhook API (deployed together on Railway).
 
 ## Features
 
@@ -25,12 +25,26 @@ npm run dev
 
 Then open the printed local URL (usually http://localhost:5173).
 
-To create a production build:
+## Production (Railway)
+
+The root [`Dockerfile`](Dockerfile) builds the CRM and serves it from the same Express app as the Facebook webhook.
+
+**Live URL:** https://crm-production-be3b.up.railway.app
+
+Push to GitHub → Railway redeploys. Open that URL in your browser for the dashboard (not `npm run dev`).
+
+Webhook API on the same host: `/health`, `/leads`, `/webhook`.
+
+See [`webhook-server/README.md`](webhook-server/README.md) for Facebook setup.
+
+### Local production preview
 
 ```bash
 npm run build
-npm run preview
+cd webhook-server && npm install && node server.js
 ```
+
+Copy `dist/` next to `server.js` or run from repo root after build (Docker does this automatically).
 
 ## How data is stored
 

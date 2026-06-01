@@ -11,15 +11,15 @@ Express server that receives Facebook Lead Ads webhooks, fetches lead details fr
 
 ## Railway Deployment
 
-Railway must run **Node** (`node server.js`), not Caddy/static. If deploy logs show Caddy on port 8080, the CRM frontend was deployed by mistake.
+Railway must run **Node only** (no Caddy). If build logs show a `caddy` phase, Nixpacks is still building the Vite app — use the **Dockerfile** builder instead (configured in [`railway.json`](../railway.json)).
 
-**Option A (recommended):** Service **Settings → Root Directory** = `webhook-server`  
-**Config file path:** `/webhook-server/railway.json`  
-**Start command:** leave empty (uses `npm start` → `node server.js`)
+**Root Directory must be `/` (repository root)** — not `webhook-server`.  
+Config file: `/railway.json` — builds root [`Dockerfile`](../Dockerfile) (CRM + webhook).
 
-**Option B:** Root Directory = `/` (repo root)  
-**Config file path:** `/railway.toml`  
-**Start command:** `npm start --prefix webhook-server` (or `node server.js` via root [`server.js`](../server.js) shim)
+If you see `Cannot GET /`, Railway is using the API-only image (no `dist/`). Fix Root Directory and redeploy.
+
+**Start command:** leave empty (Dockerfile `CMD` runs `node server.js`)  
+**Do not** use Nixpacks if the plan still lists `caddy`.
 
 1. Push to GitHub
 2. Go to [railway.app](https://railway.app) → New Project → Deploy from GitHub
@@ -54,4 +54,6 @@ curl https://crm-production-be3b.up.railway.app/leads
 
 ## CRM Integration
 
-Root `.env` sets `VITE_WEBHOOK_URL=https://crm-production-be3b.up.railway.app`. For local webhook testing, `.env.development` points to `http://localhost:3000` when you run `npm run dev`.
+On Railway, the CRM dashboard and webhook API share **https://crm-production-be3b.up.railway.app** (Dockerfile builds both). The app polls `/leads` on the same host.
+
+For local `npm run dev`, `.env.development` points `VITE_WEBHOOK_URL` at Railway (or `.env.local` → `http://localhost:3000`).

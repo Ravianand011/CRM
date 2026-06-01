@@ -7,13 +7,13 @@ import {
   writeLeads,
 } from '../utils/storage';
 
-const WEBHOOK_SERVER =
-  import.meta.env.VITE_WEBHOOK_URL || 'http://localhost:3000';
+/** Empty = same host (Railway combined deploy). Set VITE_WEBHOOK_URL for local dev. */
+const WEBHOOK_BASE = (import.meta.env.VITE_WEBHOOK_URL ?? '').replace(/\/$/, '');
 
 export function useWebhookSync(onSynced?: () => void) {
   const syncLeads = useCallback(async () => {
     try {
-      const res = await fetch(`${WEBHOOK_SERVER}/leads`);
+      const res = await fetch(`${WEBHOOK_BASE}/leads`);
       if (!res.ok) return;
       const newLeads: Lead[] = await res.json();
       if (!newLeads.length) return;

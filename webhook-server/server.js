@@ -1,6 +1,8 @@
 require('dotenv').config();
 
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const fetch = require('node-fetch');
@@ -196,6 +198,34 @@ app.get('/health', (_req, res) => {
   });
 });
 
+// CRM dashboard (Vite build in /dist) — same origin as /leads API
+const distPath = path.join(__dirname, 'dist');
+const indexHtml = path.join(distPath, 'index.html');
+const hasDashboard = fs.existsSync(indexHtml);
+
+if (hasDashboard) {
+  app.use(express.static(distPath, { index: 'index.html' }));
+  app.get('/', (_req, res) => {
+    res.sendFile(indexHtml);
+  });
+  app.get(/^\/(?!webhook|health|leads|test-lead).*/, (_req, res) => {
+    res.sendFile(indexHtml);
+  });
+} else {
+  app.get('/', (_req, res) => {
+    res.status(503).json({
+      error: 'CRM dashboard not built',
+      hint: 'Deploy from repo root with root Dockerfile (Root Directory must be /, not webhook-server)',
+      api: { health: '/health', leads: '/leads', webhook: '/webhook' },
+    });
+  });
+}
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server started on port ${PORT}`);
+  if (hasDashboard) {
+    console.log('CRM dashboard served from /dist');
+  } else {
+    console.warn('WARNING: /dist/index.html missing — API only, no dashboard');
+  }
 });

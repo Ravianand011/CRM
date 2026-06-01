@@ -1,4 +1,4 @@
-# Dockerfile build — no Nixpacks/Caddy. Root Directory should be "/" (repo root).
+# Dockerfile build — CRM + webhook. Root Directory MUST be "/" (repo root), NOT webhook-server.
 
 [build]
 builder = "dockerfile"
