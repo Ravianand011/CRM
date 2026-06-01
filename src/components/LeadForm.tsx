@@ -5,6 +5,7 @@ import { LEAD_STATUSES, STATUS_LABELS } from '../types/Lead';
 import type { LeadFormData } from '../services/leadsApi';
 import { CallHistory } from './CallHistory';
 import {
+  formatDateIST,
   fromDatetimeLocalValue,
   toDatetimeLocalValue,
 } from '../utils/datetime';
@@ -36,6 +37,9 @@ export function LeadForm({ lead, onSave, onClose }: LeadFormProps) {
     toDatetimeLocalValue(lead?.demoScheduledAt),
   );
   const [comment, setComment] = useState('');
+  const [createdAtLocal, setCreatedAtLocal] = useState(
+    toDatetimeLocalValue(lead?.createdAt ?? new Date().toISOString()),
+  );
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -75,6 +79,9 @@ export function LeadForm({ lead, onSave, onClose }: LeadFormProps) {
       demoScheduledAt: fromDatetimeLocalValue(demoScheduledAt),
       comment: comment || undefined,
       source: lead ? lead.source : 'manual',
+      createdAt: lead
+        ? lead.createdAt
+        : fromDatetimeLocalValue(createdAtLocal) ?? new Date().toISOString(),
     };
 
     setSaving(true);
@@ -157,6 +164,23 @@ export function LeadForm({ lead, onSave, onClose }: LeadFormProps) {
                 onChange={(e) => setWhenPlanningToJoin(e.target.value)}
                 placeholder="e.g. Immediately / Next month"
               />
+            </div>
+            <div>
+              <label className={labelClass}>Created date</label>
+              {lead ? (
+                <input
+                  className={`${inputClass} bg-surface-2 text-ink-2`}
+                  readOnly
+                  value={formatDateIST(lead.createdAt)}
+                />
+              ) : (
+                <input
+                  type="datetime-local"
+                  className={inputClass}
+                  value={createdAtLocal}
+                  onChange={(e) => setCreatedAtLocal(e.target.value)}
+                />
+              )}
             </div>
             <div>
               <label className={labelClass}>Lead Status</label>

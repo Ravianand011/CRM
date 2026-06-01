@@ -18,6 +18,7 @@ export interface LeadFormData {
   demoScheduledAt?: string;
   comment?: string; // appended to call history on save
   source?: LeadSource;
+  createdAt?: string; // ISO — new leads only; edits keep original
 }
 
 export interface SearchFilters {
@@ -30,6 +31,8 @@ export interface ImportResult {
   imported: number;
   duplicates: number;
   leads: Lead[];
+  matchedColumns?: { field: string; fieldLabel: string; sheetHeader: string }[];
+  ignoredColumns?: string[];
 }
 
 function newId(): string {
@@ -82,6 +85,9 @@ export function computeSavedLead(
   base.qualification = form.qualification.trim();
   base.city = form.city.trim();
   base.whenPlanningToJoin = form.whenPlanningToJoin?.trim() || undefined;
+  if (!prev && form.createdAt) {
+    base.createdAt = form.createdAt;
+  }
   base.status = newStatus;
   base.nextFollowUp = form.nextFollowUp || undefined;
   base.demoScheduledAt = form.demoScheduledAt || undefined;
@@ -176,7 +182,10 @@ export async function deleteLead(id: string): Promise<void> {
 }
 
 /** Import parsed spreadsheet rows, skipping phone-number duplicates. */
-export async function bulkImport(rows: ParsedLeadRow[]): Promise<ImportResult> {
+export async function bulkImport(
+  rows: ParsedLeadRow[],
+  meta?: Pick<ImportResult, 'matchedColumns' | 'ignoredColumns'>,
+): Promise<ImportResult> {
   const leads = readLeads();
   const existingPhones = new Set(
     leads.map((l) => l.phone).filter(Boolean),
@@ -215,7 +224,13 @@ export async function bulkImport(rows: ParsedLeadRow[]): Promise<ImportResult> {
 
   const next = [...additions, ...leads];
   writeLeads(next);
-  return { imported, duplicates, leads: next };
+  return {
+    imported,
+    duplicates,
+    leads: next,
+    matchedColumns: meta?.matchedColumns,
+    ignoredColumns: meta?.ignoredColumns,
+  };
 }
 
 /** Search + filter + sort leads (used by the All Leads page). */

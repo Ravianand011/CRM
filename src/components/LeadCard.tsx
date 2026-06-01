@@ -1,4 +1,5 @@
 import {
+  Calendar,
   CalendarCheck2,
   Clock,
   Import,
@@ -18,7 +19,7 @@ import {
 } from 'date-fns';
 import type { Lead } from '../types/Lead';
 import { StatusBadge } from './StatusBadge';
-import { formatIST } from '../utils/datetime';
+import { formatDateIST, formatIST } from '../utils/datetime';
 import { isDueToday, isOverdue } from '../utils/scheduler';
 
 interface LeadCardProps {
@@ -144,6 +145,12 @@ export function LeadCard({ lead, onEdit }: LeadCardProps) {
               <span className="flex items-center gap-1">
                 <GraduationCap size={12} />
                 {lead.qualification}
+              </span>
+            )}
+            {lead.createdAt && (
+              <span className="flex items-center gap-1">
+                <Calendar size={12} />
+                Added {formatDateIST(lead.createdAt)}
               </span>
             )}
             {lead.status === 'demo_scheduled' && lead.demoScheduledAt && (

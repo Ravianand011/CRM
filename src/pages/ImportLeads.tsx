@@ -3,7 +3,10 @@ import type { ImportResult } from '../services/leadsApi';
 import type { ParsedLeadRow } from '../utils/excelMapper';
 
 interface ImportLeadsProps {
-  onImport: (rows: ParsedLeadRow[]) => Promise<ImportResult>;
+  onImport: (
+    rows: ParsedLeadRow[],
+    meta?: Pick<ImportResult, 'matchedColumns' | 'ignoredColumns'>,
+  ) => Promise<ImportResult>;
 }
 
 export function ImportLeads({ onImport }: ImportLeadsProps) {
@@ -11,8 +14,9 @@ export function ImportLeads({ onImport }: ImportLeadsProps) {
     <div>
       <h2 className="mb-1 text-[14px] font-medium text-ink">Import Excel</h2>
       <p className="mb-5 text-[12px] text-ink-2">
-        Upload a Facebook Lead Ads Excel export. Columns are mapped
-        automatically and duplicate phone numbers are skipped.
+        Upload a lead sheet (.xlsx, .xls, or .csv). Matching columns are saved
+        automatically; anything that does not match Name, Phone, Email, City,
+        Qualification, Planning to join, or Created date is ignored.
       </p>
       <ExcelImporter onImport={onImport} />
     </div>

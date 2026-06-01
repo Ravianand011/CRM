@@ -87,8 +87,11 @@ export function useLeads() {
   );
 
   const importRows = useCallback(
-    async (rows: ParsedLeadRow[]): Promise<ImportResult> => {
-      const result = await bulkImport(rows);
+    async (
+      rows: ParsedLeadRow[],
+      meta?: Pick<ImportResult, 'matchedColumns' | 'ignoredColumns'>,
+    ): Promise<ImportResult> => {
+      const result = await bulkImport(rows, meta);
       await refresh();
       return result;
     },

@@ -15,11 +15,16 @@ const leadsStore = [];
 const FIELD_MAP = {
   full_name: 'name',
   name: 'name',
+  first_name: 'firstName',
+  last_name: 'lastName',
   phone_number: 'phone',
   phone: 'phone',
+  mobile: 'phone',
+  contact_number: 'phone',
   email: 'email',
   city: 'city',
   what_is_your_qualification: 'qualification',
+  qualification: 'qualification',
   when_are_you_planning_to_join: 'whenPlanningToJoin',
 };
 
@@ -63,17 +68,120 @@ function flattenFieldData(fieldData) {
       result[key] = field.values[0];
     }
   }
+
+  if (!result.name && (result.firstName || result.lastName)) {
+    result.name = [result.firstName, result.lastName].filter(Boolean).join(' ');
+  }
+
   return result;
 }
 
+function buildLeadFromGraphRow(data) {
+  const leadgenId = String(data.id);
+  const fields = flattenFieldData(data.field_data);
+  const createdAt = data.created_time || new Date().toISOString();
+
+  return {
+    id: `fb_${leadgenId}`,
+    name: fields.name || 'Facebook Lead',
+    phone: fields.phone || `fb-${leadgenId}`,
+    email: fields.email || '',
+    city: fields.city || '',
+    qualification: fields.qualification || '',
+    whenPlanningToJoin: fields.whenPlanningToJoin || '',
+    source: 'facebook',
+    status: 'not_picked',
+    missedCallCount: 0,
+    permanentlyHidden: false,
+    createdAt,
+    updatedAt: createdAt,
+    callHistory: [],
+    fbLeadId: leadgenId,
+  };
+}
+
+function leadExists(lead) {
+  return leadsStore.some(
+    (l) =>
+      (lead.fbLeadId && l.fbLeadId === lead.fbLeadId) ||
+      (lead.phone && l.phone && l.phone === lead.phone),
+  );
+}
+
 function saveLead(lead) {
-  if (leadsStore.some((l) => l.phone === lead.phone)) {
-    console.log(`Duplicate lead skipped: ${lead.phone}`);
+  if (leadExists(lead)) {
+    console.log(`Duplicate lead skipped: ${lead.name} - ${lead.phone}`);
     return false;
   }
   leadsStore.push(lead);
   console.log(`Lead saved: ${lead.name} - ${lead.phone}`);
   return true;
+}
+
+async function graphGet(url) {
+  const res = await fetch(url);
+  const data = await res.json();
+  if (!res.ok) {
+    const msg = data.error?.message || JSON.stringify(data);
+    throw new Error(msg);
+  }
+  return data;
+}
+
+async function fetchAllPages(firstUrl) {
+  const items = [];
+  let url = firstUrl;
+  while (url) {
+    const data = await graphGet(url);
+    if (Array.isArray(data.data)) items.push(...data.data);
+    url = data.paging?.next || null;
+  }
+  return items;
+}
+
+async function syncAllLeadsFromFacebook() {
+  const token = process.env.FB_PAGE_ACCESS_TOKEN;
+  if (!token) {
+    throw new Error('FB_PAGE_ACCESS_TOKEN not set in Railway variables');
+  }
+
+  let pageId = process.env.FB_PAGE_ID;
+  if (!pageId) {
+    const me = await graphGet(
+      `https://graph.facebook.com/v19.0/me?fields=id&access_token=${token}`,
+    );
+    pageId = me.id;
+  }
+
+  const forms = await fetchAllPages(
+    `https://graph.facebook.com/v19.0/${pageId}/leadgen_forms?fields=id,name&limit=100&access_token=${token}`,
+  );
+
+  let added = 0;
+  let skipped = 0;
+
+  for (const form of forms) {
+    const rows = await fetchAllPages(
+      `https://graph.facebook.com/v19.0/${form.id}/leads?fields=id,created_time,field_data&limit=100&access_token=${token}`,
+    );
+    for (const row of rows) {
+      const lead = buildLeadFromGraphRow(row);
+      if (saveLead(lead)) added += 1;
+      else skipped += 1;
+    }
+  }
+
+  console.log(
+    `Facebook sync: ${added} added, ${skipped} skipped, ${forms.length} form(s), ${leadsStore.length} total`,
+  );
+
+  return {
+    added,
+    skipped,
+    forms: forms.length,
+    total: leadsStore.length,
+    pageId,
+  };
 }
 
 async function fetchLeadFromFacebook(leadgenId) {
@@ -89,35 +197,8 @@ async function fetchLeadFromFacebook(leadgenId) {
     `&access_token=${token}`;
 
   try {
-    const res = await fetch(url);
-    const data = await res.json();
-
-    if (!res.ok) {
-      console.error('Graph API error:', data);
-      return;
-    }
-
-    const fields = flattenFieldData(data.field_data);
-
-    const lead = {
-      id: `fb_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      name: fields.name || '',
-      phone: fields.phone || '',
-      email: fields.email || '',
-      city: fields.city || '',
-      qualification: fields.qualification || '',
-      whenPlanningToJoin: fields.whenPlanningToJoin || '',
-      source: 'facebook',
-      status: 'not_picked',
-      missedCallCount: 0,
-      permanentlyHidden: false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      callHistory: [],
-      fbLeadId: leadgenId,
-    };
-
-    saveLead(lead);
+    const data = await graphGet(url);
+    saveLead(buildLeadFromGraphRow(data));
   } catch (err) {
     console.error('fetchLeadFromFacebook error:', err.message);
   }
@@ -164,6 +245,17 @@ app.get('/leads', (_req, res) => {
   res.json(leadsStore);
 });
 
+// Pull all historical leads from Facebook Lead Ads forms
+app.post('/sync-facebook', async (_req, res) => {
+  try {
+    const result = await syncAllLeadsFromFacebook();
+    res.json({ success: true, ...result });
+  } catch (err) {
+    console.error('sync-facebook error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Add a test lead without Facebook
 app.post('/test-lead', (_req, res) => {
   const now = new Date().toISOString();
@@ -208,7 +300,7 @@ if (hasDashboard) {
   app.get('/', (_req, res) => {
     res.sendFile(indexHtml);
   });
-  app.get(/^\/(?!webhook|health|leads|test-lead).*/, (_req, res) => {
+  app.get(/^\/(?!webhook|health|leads|test-lead|sync-facebook).*/, (_req, res) => {
     res.sendFile(indexHtml);
   });
 } else {

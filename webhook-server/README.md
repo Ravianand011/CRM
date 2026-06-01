@@ -44,11 +44,19 @@ If you see `Cannot GET /`, Railway is using the API-only image (no `dist/`). Fix
 5. Subscribe to field: **leadgen**
 6. Save
 
+## Pull all Facebook leads
+
+`POST /sync-facebook` fetches every lead from all Lead Ad forms on your Page (historical + new). The CRM calls this on load and has a **Sync Facebook** button in the sidebar.
+
+Required Railway variable: `FB_PAGE_ACCESS_TOKEN` with `leads_retrieval` permission.
+
+Optional: `FB_PAGE_ID` (otherwise detected from the token).
+
 ## Test
 
 ```bash
 curl https://crm-production-be3b.up.railway.app/health
-curl -X POST https://crm-production-be3b.up.railway.app/test-lead
+curl -X POST https://crm-production-be3b.up.railway.app/sync-facebook
 curl https://crm-production-be3b.up.railway.app/leads
 ```
 

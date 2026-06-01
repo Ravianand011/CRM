@@ -26,7 +26,7 @@ const TITLES: Record<View, string> = {
 function App() {
   const { leads, loading, mode, switchMode, save, importRows, backup, refresh } =
     useLeads();
-  useWebhookSync(refresh);
+  const { syncFacebook } = useWebhookSync(refresh);
   const { reminders, count } = useNotifications(leads);
   const { now } = useFollowUpScheduler();
 
@@ -97,6 +97,16 @@ function App() {
             openNew();
           }}
           onExport={() => void backup()}
+          onSyncFacebook={async () => {
+            const result = await syncFacebook();
+            if (result?.success) {
+              alert(
+                `Facebook sync: ${result.added} new, ${result.total} total on server`,
+              );
+            } else if (result?.error) {
+              alert(`Facebook sync failed: ${result.error}`);
+            }
+          }}
         />
       </div>
 
