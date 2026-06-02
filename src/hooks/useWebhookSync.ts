@@ -29,11 +29,13 @@ export function useWebhookSync(onSynced?: () => void) {
       const existingPhones = new Set(
         existing.map((l) => normalizePhone(l.phone)).filter(Boolean),
       );
+      const existingIds = new Set(existing.map((l) => l.id).filter(Boolean));
       const existingFbIds = new Set(
         existing.map((l) => l.fbLeadId).filter(Boolean),
       );
 
       const brandNew = serverLeads.filter((l) => {
+        if (l.id && existingIds.has(l.id)) return false;
         if (isLeadBlocked(l)) return false;
         if (l.fbLeadId && existingFbIds.has(l.fbLeadId)) return false;
         const phoneKey = normalizePhone(l.phone);
@@ -41,13 +43,14 @@ export function useWebhookSync(onSynced?: () => void) {
         return true;
       });
 
-      if (brandNew.length > 0) {
-        writeLeads([...brandNew, ...existing]);
-        console.log(`${brandNew.length} new lead(s) synced from server`);
+      const toAdd = brandNew.filter((l) => !isLeadBlocked(l));
+      if (toAdd.length > 0) {
+        writeLeads([...toAdd, ...existing]);
+        console.log(`${toAdd.length} new lead(s) synced from server`);
 
         window.dispatchEvent(
           new CustomEvent('newLeadsReceived', {
-            detail: { count: brandNew.length, leads: brandNew },
+            detail: { count: toAdd.length, leads: toAdd },
           }),
         );
 

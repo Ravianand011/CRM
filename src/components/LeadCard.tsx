@@ -252,7 +252,9 @@ export function LeadCard({
                 await onDelete(lead);
               } catch (err) {
                 console.error('Failed to delete lead', err);
-                window.alert('Could not delete this lead. Please try again.');
+                window.alert(
+                  'Could not delete this lead. Refresh the page and try again.',
+                );
               }
             }}
             className={`${lbtn} border-tone-red-tx/30 bg-tone-red-bg text-tone-red-tx`}

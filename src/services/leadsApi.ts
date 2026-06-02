@@ -1,5 +1,6 @@
 import type { CallNote, Lead, LeadSource, LeadStatus } from '../types/Lead';
 import type { ParsedLeadRow } from '../utils/excelMapper';
+import { normalizePhone } from '../utils/phone';
 import { downloadBackup, readLeads, writeLeads } from '../utils/storage';
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -175,8 +176,27 @@ export async function updateLead(
   return updated;
 }
 
-export async function deleteLead(id: string): Promise<void> {
-  writeLeads(readLeads().filter((l) => l.id !== id));
+/** True when `candidate` should be removed together with `target` (duplicates). */
+export function shouldDeleteTogether(candidate: Lead, target: Lead): boolean {
+  if (candidate.id === target.id) return true;
+  const targetPhone = normalizePhone(target.phone);
+  const candidatePhone = normalizePhone(candidate.phone);
+  if (targetPhone && candidatePhone && targetPhone === candidatePhone) return true;
+  if (target.fbLeadId && candidate.fbLeadId && target.fbLeadId === candidate.fbLeadId) {
+    return true;
+  }
+  return false;
+}
+
+/** Delete target lead and any local duplicates (same phone / fbLeadId). */
+export async function deleteLead(id: string): Promise<number> {
+  const leads = readLeads();
+  const target = leads.find((l) => l.id === id);
+  if (!target) return 0;
+
+  const next = leads.filter((l) => !shouldDeleteTogether(l, target));
+  writeLeads(next);
+  return leads.length - next.length;
 }
 
 /** Import parsed spreadsheet rows, skipping phone-number duplicates. */

@@ -73,12 +73,37 @@ function buildLeadFromGraphRow(data) {
   };
 }
 
+function normalizePhone(phone) {
+  const digits = String(phone || '').replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.length >= 10) return digits.slice(-10);
+  return digits;
+}
+
 function leadExists(lead) {
-  return leadsStore.some(
-    (l) =>
-      (lead.fbLeadId && l.fbLeadId === lead.fbLeadId) ||
-      (lead.phone && l.phone && l.phone === lead.phone),
-  );
+  const phoneKey = normalizePhone(lead.phone);
+  return leadsStore.some((l) => {
+    if (lead.fbLeadId && l.fbLeadId === lead.fbLeadId) return true;
+    if (phoneKey && normalizePhone(l.phone) === phoneKey) return true;
+    return !!(lead.phone && l.phone && l.phone === lead.phone);
+  });
+}
+
+function removeLeadsFromStore({ id, phone, fbLeadId }) {
+  const phoneKey = normalizePhone(phone);
+  let removed = 0;
+  for (let i = leadsStore.length - 1; i >= 0; i -= 1) {
+    const l = leadsStore[i];
+    const match =
+      (id && l.id === id) ||
+      (fbLeadId && l.fbLeadId === fbLeadId) ||
+      (phoneKey && normalizePhone(l.phone) === phoneKey);
+    if (match) {
+      leadsStore.splice(i, 1);
+      removed += 1;
+    }
+  }
+  return removed;
 }
 
 function saveLead(lead) {
@@ -284,6 +309,23 @@ app.post('/webhook', (req, res) => {
 
 app.get('/leads', (_req, res) => {
   res.json(leadsStore);
+});
+
+app.delete('/leads/:id', (req, res) => {
+  const id = decodeURIComponent(req.params.id);
+  const found = leadsStore.find((l) => l.id === id);
+  const removed = removeLeadsFromStore({
+    id,
+    phone: found?.phone,
+    fbLeadId: found?.fbLeadId,
+  });
+  res.json({ success: true, removed });
+});
+
+app.delete('/leads', (req, res) => {
+  const { id, phone, fbLeadId } = req.body || {};
+  const removed = removeLeadsFromStore({ id, phone, fbLeadId });
+  res.json({ success: true, removed });
 });
 
 app.post('/sync-facebook', async (_req, res) => {

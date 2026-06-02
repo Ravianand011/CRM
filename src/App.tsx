@@ -6,6 +6,8 @@ import { useWebhookSync } from './hooks/useWebhookSync';
 import { useNotifications } from './hooks/useNotifications';
 import { useFollowUpScheduler } from './hooks/useFollowUpScheduler';
 import { buildQueue } from './utils/scheduler';
+import { shouldDeleteTogether } from './services/leadsApi';
+import { deleteLeadOnServer } from './services/serverLeads';
 import { markLeadDeleted } from './utils/syncBlocklist';
 import { Sidebar } from './components/Sidebar';
 import { Navbar } from './components/Navbar';
@@ -75,13 +77,21 @@ function App() {
   };
 
   const deleteLead = async (lead: Lead) => {
-    try {
-      markLeadDeleted(lead);
-    } catch (err) {
-      // Continue delete even if blocklist write fails.
-      console.error('Failed to cache deleted lead in blocklist', err);
+    for (const l of leads) {
+      if (!shouldDeleteTogether(l, lead)) continue;
+      try {
+        markLeadDeleted(l);
+      } catch (err) {
+        console.error('Failed to cache deleted lead in blocklist', err);
+      }
     }
-    await remove(lead.id);
+
+    await deleteLeadOnServer(lead);
+
+    const removed = await remove(lead.id);
+    if (removed === 0) {
+      throw new Error('Lead not found');
+    }
   };
 
   const navigate = (v: View) => {
