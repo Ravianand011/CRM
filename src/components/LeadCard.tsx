@@ -27,7 +27,6 @@ interface LeadCardProps {
   lead: Lead;
   onEdit: (lead: Lead) => void;
   onDelete?: (lead: Lead) => Promise<void> | void;
-  onNotInterested?: (lead: Lead) => Promise<void> | void;
   isDuplicate?: boolean;
 }
 
@@ -75,7 +74,6 @@ export function LeadCard({
   lead,
   onEdit,
   onDelete,
-  onNotInterested,
   isDuplicate,
 }: LeadCardProps) {
   const overdue = isOverdue(lead);
@@ -244,22 +242,6 @@ export function LeadCard({
         >
           <Save size={13} /> Save + schedule
         </button>
-        {onNotInterested && lead.status !== 'not_interested' && (
-          <button
-            type="button"
-            onClick={async () => {
-              try {
-                await onNotInterested(lead);
-              } catch (err) {
-                console.error('Failed to update lead status', err);
-                window.alert('Could not mark as Not Interested. Please try again.');
-              }
-            }}
-            className={`${lbtn} border-tone-red-tx/30 bg-tone-red-bg text-tone-red-tx`}
-          >
-            Not Interested
-          </button>
-        )}
         {onDelete && (
           <button
             type="button"

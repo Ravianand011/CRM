@@ -6,14 +6,12 @@ interface ConvertedProps {
   leads: Lead[];
   onEdit: (lead: Lead) => void;
   onDelete: (lead: Lead) => void;
-  onNotInterested: (lead: Lead) => void;
 }
 
 export function Converted({
   leads,
   onEdit,
   onDelete,
-  onNotInterested,
 }: ConvertedProps) {
   const won = useMemo(
     () =>
@@ -38,7 +36,6 @@ export function Converted({
         leads={won}
         onEdit={onEdit}
         onDelete={onDelete}
-        onNotInterested={onNotInterested}
         emptyMessage="No converted leads yet."
       />
     </div>

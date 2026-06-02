@@ -6,7 +6,6 @@ interface FollowUpQueueProps {
   leads: Lead[];
   onEdit: (lead: Lead) => void;
   onDelete?: (lead: Lead) => void;
-  onNotInterested?: (lead: Lead) => void;
   emptyMessage?: string;
 }
 
@@ -22,7 +21,6 @@ export function FollowUpQueue({
   leads,
   onEdit,
   onDelete,
-  onNotInterested,
   emptyMessage = 'Nothing here right now.',
 }: FollowUpQueueProps) {
   if (leads.length === 0) {
@@ -56,7 +54,6 @@ export function FollowUpQueue({
           lead={lead}
           onEdit={onEdit}
           onDelete={onDelete}
-          onNotInterested={onNotInterested}
           isDuplicate={duplicateLeadIds.has(lead.id)}
         />
       ))}

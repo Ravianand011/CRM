@@ -75,24 +75,13 @@ function App() {
   };
 
   const deleteLead = async (lead: Lead) => {
-    markLeadDeleted(lead);
+    try {
+      markLeadDeleted(lead);
+    } catch (err) {
+      // Continue delete even if blocklist write fails.
+      console.error('Failed to cache deleted lead in blocklist', err);
+    }
     await remove(lead.id);
-  };
-  const markNotInterested = async (lead: Lead) => {
-    await save(
-      {
-        name: lead.name,
-        phone: lead.phone,
-        email: lead.email,
-        qualification: lead.qualification,
-        city: lead.city,
-        whenPlanningToJoin: lead.whenPlanningToJoin,
-        status: 'not_interested',
-        source: lead.source,
-        createdAt: lead.createdAt,
-      },
-      lead.id,
-    );
   };
 
   const navigate = (v: View) => {
@@ -166,7 +155,6 @@ function App() {
                   reminders={reminders}
                   onEdit={openEdit}
                   onDelete={deleteLead}
-                  onNotInterested={markNotInterested}
                   onSelectReminder={openReminderLead}
                 />
               )}
@@ -176,7 +164,6 @@ function App() {
                   search={search}
                   onEdit={openEdit}
                   onDelete={deleteLead}
-                  onNotInterested={markNotInterested}
                 />
               )}
               {view === 'demo' && (
@@ -184,7 +171,6 @@ function App() {
                   leads={leads}
                   onEdit={openEdit}
                   onDelete={deleteLead}
-                  onNotInterested={markNotInterested}
                 />
               )}
               {view === 'converted' && (
@@ -192,7 +178,6 @@ function App() {
                   leads={leads}
                   onEdit={openEdit}
                   onDelete={deleteLead}
-                  onNotInterested={markNotInterested}
                 />
               )}
               {view === 'import' && <ImportLeads onImport={importRows} />}

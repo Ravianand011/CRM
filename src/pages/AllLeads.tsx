@@ -9,7 +9,6 @@ interface AllLeadsProps {
   search: string;
   onEdit: (lead: Lead) => void;
   onDelete: (lead: Lead) => void;
-  onNotInterested: (lead: Lead) => void;
 }
 
 const selectClass =
@@ -20,7 +19,6 @@ export function AllLeads({
   search,
   onEdit,
   onDelete,
-  onNotInterested,
 }: AllLeadsProps) {
   const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all');
   const [sort, setSort] = useState<SortKey>('createdAt');
@@ -83,7 +81,6 @@ export function AllLeads({
         leads={filtered}
         onEdit={onEdit}
         onDelete={onDelete}
-        onNotInterested={onNotInterested}
         emptyMessage="No leads match your search/filter."
       />
     </div>
