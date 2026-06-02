@@ -16,7 +16,6 @@ import {
   exportBackup,
   getLeads,
   saveLead,
-  shouldDeleteTogether,
   updateLead,
   type ImportResult,
   type LeadFormData,
@@ -80,16 +79,9 @@ export function useLeads() {
   );
 
   const remove = useCallback(
-    async (id: string): Promise<number> => {
-      const current = await getLeads();
-      const target = current.find((l) => l.id === id);
-      if (!target) return 0;
-
-      setLeads((prev) => prev.filter((l) => !shouldDeleteTogether(l, target)));
-
-      const removed = await deleteLead(id);
+    async (id: string) => {
+      await deleteLead(id);
       await refresh();
-      return removed;
     },
     [refresh],
   );
