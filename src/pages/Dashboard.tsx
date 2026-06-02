@@ -15,6 +15,7 @@ interface DashboardProps {
   reminders: DemoReminder[];
   onEdit: (lead: Lead) => void;
   onDelete: (lead: Lead) => void;
+  onNotInterested: (lead: Lead) => void;
   onSelectReminder: (leadId: string) => void;
 }
 
@@ -34,6 +35,7 @@ export function Dashboard({
   reminders,
   onEdit,
   onDelete,
+  onNotInterested,
   onSelectReminder,
 }: DashboardProps) {
   const [filter, setFilter] = useState<QueueFilter>('all');
@@ -116,6 +118,7 @@ export function Dashboard({
           leads={filtered}
           onEdit={onEdit}
           onDelete={onDelete}
+          onNotInterested={onNotInterested}
           emptyMessage="No leads due right now. Great job staying on top of it!"
         />
       </div>

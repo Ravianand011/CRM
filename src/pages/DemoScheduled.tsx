@@ -6,9 +6,15 @@ interface DemoScheduledProps {
   leads: Lead[];
   onEdit: (lead: Lead) => void;
   onDelete: (lead: Lead) => void;
+  onNotInterested: (lead: Lead) => void;
 }
 
-export function DemoScheduled({ leads, onEdit, onDelete }: DemoScheduledProps) {
+export function DemoScheduled({
+  leads,
+  onEdit,
+  onDelete,
+  onNotInterested,
+}: DemoScheduledProps) {
   const demos = useMemo(
     () =>
       leads
@@ -33,6 +39,7 @@ export function DemoScheduled({ leads, onEdit, onDelete }: DemoScheduledProps) {
         leads={demos}
         onEdit={onEdit}
         onDelete={onDelete}
+        onNotInterested={onNotInterested}
         emptyMessage="No demos scheduled yet."
       />
     </div>

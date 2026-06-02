@@ -26,7 +26,8 @@ import { isDueToday, isOverdue } from '../utils/scheduler';
 interface LeadCardProps {
   lead: Lead;
   onEdit: (lead: Lead) => void;
-  onDelete?: (lead: Lead) => void;
+  onDelete?: (lead: Lead) => Promise<void> | void;
+  onNotInterested?: (lead: Lead) => Promise<void> | void;
   isDuplicate?: boolean;
 }
 
@@ -70,7 +71,13 @@ function ordinal(n: number): string {
 const lbtn =
   'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px] font-medium';
 
-export function LeadCard({ lead, onEdit, onDelete, isDuplicate }: LeadCardProps) {
+export function LeadCard({
+  lead,
+  onEdit,
+  onDelete,
+  onNotInterested,
+  isDuplicate,
+}: LeadCardProps) {
   const overdue = isOverdue(lead);
   const dueToday = !overdue && isDueToday(lead);
 
@@ -224,17 +231,35 @@ export function LeadCard({ lead, onEdit, onDelete, isDuplicate }: LeadCardProps)
           </span>
         )}
         <button
+          type="button"
           onClick={() => onEdit(lead)}
           className={`${lbtn} border-line-2 bg-surface text-ink-2 hover:bg-surface-2`}
         >
           <Pencil size={13} /> Update
         </button>
         <button
+          type="button"
           onClick={() => onEdit(lead)}
           className={`${lbtn} border-av-teal-tx/30 bg-av-teal-bg text-av-teal-tx`}
         >
           <Save size={13} /> Save + schedule
         </button>
+        {onNotInterested && lead.status !== 'not_interested' && (
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await onNotInterested(lead);
+              } catch (err) {
+                console.error('Failed to update lead status', err);
+                window.alert('Could not mark as Not Interested. Please try again.');
+              }
+            }}
+            className={`${lbtn} border-tone-red-tx/30 bg-tone-red-bg text-tone-red-tx`}
+          >
+            Not Interested
+          </button>
+        )}
         {onDelete && (
           <button
             type="button"

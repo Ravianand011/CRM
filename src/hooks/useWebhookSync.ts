@@ -15,6 +15,7 @@ const WEBHOOK_SERVER =
 
 export function useWebhookSync(onSynced?: () => void) {
   const pullLeads = useCallback(async () => {
+    const prevMode = getDataMode();
     try {
       const base = WEBHOOK_SERVER.replace(/\/$/, '');
       const res = await fetch(`${base}/leads`);
@@ -22,7 +23,6 @@ export function useWebhookSync(onSynced?: () => void) {
 
       const serverLeads: Lead[] = await res.json();
 
-      const prevMode = getDataMode();
       setDataMode('real');
       const existing = readLeads();
 
@@ -54,9 +54,10 @@ export function useWebhookSync(onSynced?: () => void) {
         onSynced?.();
       }
 
-      setDataMode(prevMode);
     } catch (err) {
       console.log('Webhook server not reachable:', err);
+    } finally {
+      setDataMode(prevMode);
     }
   }, [onSynced]);
 

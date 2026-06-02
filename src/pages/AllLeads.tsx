@@ -9,12 +9,19 @@ interface AllLeadsProps {
   search: string;
   onEdit: (lead: Lead) => void;
   onDelete: (lead: Lead) => void;
+  onNotInterested: (lead: Lead) => void;
 }
 
 const selectClass =
   'rounded-md border border-line-2 bg-surface px-3 py-1.5 text-[13px] text-ink outline-none focus:border-brand-border';
 
-export function AllLeads({ leads, search, onEdit, onDelete }: AllLeadsProps) {
+export function AllLeads({
+  leads,
+  search,
+  onEdit,
+  onDelete,
+  onNotInterested,
+}: AllLeadsProps) {
   const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all');
   const [sort, setSort] = useState<SortKey>('createdAt');
 
@@ -76,6 +83,7 @@ export function AllLeads({ leads, search, onEdit, onDelete }: AllLeadsProps) {
         leads={filtered}
         onEdit={onEdit}
         onDelete={onDelete}
+        onNotInterested={onNotInterested}
         emptyMessage="No leads match your search/filter."
       />
     </div>

@@ -60,13 +60,6 @@ export function LeadForm({ lead, onSave, onClose }: LeadFormProps) {
       return;
     }
 
-    if (finalStatus === 'not_interested') {
-      const ok = window.confirm(
-        'Mark this lead as Not Interested? They will be removed from the follow-up queue but stay visible in All Leads.',
-      );
-      if (!ok) return;
-    }
-
     const form: LeadFormData = {
       name,
       phone,
@@ -248,6 +241,7 @@ export function LeadForm({ lead, onSave, onClose }: LeadFormProps) {
 
         <div className="flex flex-wrap gap-2 border-t border-line px-6 py-4">
           <button
+            type="button"
             onClick={() => submit()}
             disabled={saving}
             className="rounded-md bg-brand px-4 py-2 text-[13px] font-medium text-brand-soft hover:opacity-95 disabled:opacity-50"
@@ -255,6 +249,7 @@ export function LeadForm({ lead, onSave, onClose }: LeadFormProps) {
             Save Lead
           </button>
           <button
+            type="button"
             onClick={() => submit()}
             disabled={saving}
             className="rounded-md border border-av-teal-tx/30 bg-av-teal-bg px-4 py-2 text-[13px] font-medium text-av-teal-tx hover:opacity-95 disabled:opacity-50"
@@ -262,6 +257,7 @@ export function LeadForm({ lead, onSave, onClose }: LeadFormProps) {
             Next Follow-up
           </button>
           <button
+            type="button"
             onClick={() => submit('not_picked')}
             disabled={saving}
             className="rounded-md bg-tone-gray-bg px-4 py-2 text-[13px] font-medium text-tone-gray-tx hover:opacity-95 disabled:opacity-50"
@@ -269,6 +265,7 @@ export function LeadForm({ lead, onSave, onClose }: LeadFormProps) {
             Mark Not Picked
           </button>
           <button
+            type="button"
             onClick={() => submit('switch_off')}
             disabled={saving}
             className="rounded-md bg-ink px-4 py-2 text-[13px] font-medium text-surface hover:opacity-95 disabled:opacity-50"
@@ -276,7 +273,11 @@ export function LeadForm({ lead, onSave, onClose }: LeadFormProps) {
             Switch Off
           </button>
           <button
-            onClick={() => submit('not_interested')}
+            type="button"
+            onClick={() => {
+              setStatus('not_interested');
+              void submit('not_interested');
+            }}
             disabled={saving}
             className="rounded-md bg-tone-red-bg px-4 py-2 text-[13px] font-medium text-tone-red-tx hover:opacity-95 disabled:opacity-50"
           >

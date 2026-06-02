@@ -78,6 +78,22 @@ function App() {
     markLeadDeleted(lead);
     await remove(lead.id);
   };
+  const markNotInterested = async (lead: Lead) => {
+    await save(
+      {
+        name: lead.name,
+        phone: lead.phone,
+        email: lead.email,
+        qualification: lead.qualification,
+        city: lead.city,
+        whenPlanningToJoin: lead.whenPlanningToJoin,
+        status: 'not_interested',
+        source: lead.source,
+        createdAt: lead.createdAt,
+      },
+      lead.id,
+    );
+  };
 
   const navigate = (v: View) => {
     setView(v);
@@ -150,6 +166,7 @@ function App() {
                   reminders={reminders}
                   onEdit={openEdit}
                   onDelete={deleteLead}
+                  onNotInterested={markNotInterested}
                   onSelectReminder={openReminderLead}
                 />
               )}
@@ -159,13 +176,24 @@ function App() {
                   search={search}
                   onEdit={openEdit}
                   onDelete={deleteLead}
+                  onNotInterested={markNotInterested}
                 />
               )}
               {view === 'demo' && (
-                <DemoScheduled leads={leads} onEdit={openEdit} onDelete={deleteLead} />
+                <DemoScheduled
+                  leads={leads}
+                  onEdit={openEdit}
+                  onDelete={deleteLead}
+                  onNotInterested={markNotInterested}
+                />
               )}
               {view === 'converted' && (
-                <Converted leads={leads} onEdit={openEdit} onDelete={deleteLead} />
+                <Converted
+                  leads={leads}
+                  onEdit={openEdit}
+                  onDelete={deleteLead}
+                  onNotInterested={markNotInterested}
+                />
               )}
               {view === 'import' && <ImportLeads onImport={importRows} />}
             </>
