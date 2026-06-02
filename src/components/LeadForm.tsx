@@ -62,7 +62,7 @@ export function LeadForm({ lead, onSave, onClose }: LeadFormProps) {
 
     if (finalStatus === 'not_interested') {
       const ok = window.confirm(
-        'Mark this lead as Not Interested? If a demo was already scheduled or done, it will be hidden permanently.',
+        'Mark this lead as Not Interested? They will be removed from the follow-up queue but stay visible in All Leads.',
       );
       if (!ok) return;
     }
@@ -88,6 +88,9 @@ export function LeadForm({ lead, onSave, onClose }: LeadFormProps) {
     try {
       await onSave(form, lead?.id);
       onClose();
+    } catch (err) {
+      console.error('Failed to save lead', err);
+      setError('Could not save. Please try again.');
     } finally {
       setSaving(false);
     }

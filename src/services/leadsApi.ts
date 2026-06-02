@@ -109,12 +109,10 @@ export function computeSavedLead(
     base.hiddenUntil = undefined;
   }
 
-  // Permanent hide: lost the lead after a demo was scheduled/done.
-  if (
-    newStatus === 'not_interested' &&
-    (prevStatus === 'demo_scheduled' || prevStatus === 'demo_done')
-  ) {
+  if (newStatus === 'not_interested') {
     base.permanentlyHidden = true;
+    base.hiddenUntil = undefined;
+    base.nextFollowUp = undefined;
   }
 
   // Append the current comment to the call history timeline.

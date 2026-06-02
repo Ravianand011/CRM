@@ -1,5 +1,7 @@
 import { useEffect, useCallback } from 'react';
 import type { Lead } from '../types/Lead';
+import { normalizePhone } from '../utils/phone';
+import { isLeadBlocked } from '../utils/syncBlocklist';
 import {
   getDataMode,
   readLeads,
@@ -25,15 +27,17 @@ export function useWebhookSync(onSynced?: () => void) {
       const existing = readLeads();
 
       const existingPhones = new Set(
-        existing.map((l) => l.phone).filter(Boolean),
+        existing.map((l) => normalizePhone(l.phone)).filter(Boolean),
       );
       const existingFbIds = new Set(
         existing.map((l) => l.fbLeadId).filter(Boolean),
       );
 
       const brandNew = serverLeads.filter((l) => {
+        if (isLeadBlocked(l)) return false;
         if (l.fbLeadId && existingFbIds.has(l.fbLeadId)) return false;
-        if (l.phone && existingPhones.has(l.phone)) return false;
+        const phoneKey = normalizePhone(l.phone);
+        if (phoneKey && existingPhones.has(phoneKey)) return false;
         return true;
       });
 

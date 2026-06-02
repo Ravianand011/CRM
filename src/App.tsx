@@ -6,6 +6,7 @@ import { useWebhookSync } from './hooks/useWebhookSync';
 import { useNotifications } from './hooks/useNotifications';
 import { useFollowUpScheduler } from './hooks/useFollowUpScheduler';
 import { buildQueue } from './utils/scheduler';
+import { markLeadDeleted } from './utils/syncBlocklist';
 import { Sidebar } from './components/Sidebar';
 import { Navbar } from './components/Navbar';
 import { LeadForm } from './components/LeadForm';
@@ -74,6 +75,7 @@ function App() {
   };
 
   const deleteLead = async (lead: Lead) => {
+    markLeadDeleted(lead);
     await remove(lead.id);
   };
 

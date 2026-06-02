@@ -238,9 +238,15 @@ export function LeadCard({ lead, onEdit, onDelete, isDuplicate }: LeadCardProps)
         {onDelete && (
           <button
             type="button"
-            onClick={() => {
+            onClick={async () => {
               const ok = window.confirm(`Delete lead: ${lead.name}?`);
-              if (ok) onDelete(lead);
+              if (!ok) return;
+              try {
+                await onDelete(lead);
+              } catch (err) {
+                console.error('Failed to delete lead', err);
+                window.alert('Could not delete this lead. Please try again.');
+              }
             }}
             className={`${lbtn} border-tone-red-tx/30 bg-tone-red-bg text-tone-red-tx`}
           >
