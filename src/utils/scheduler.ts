@@ -14,6 +14,10 @@ const HOUR_MS = 60 * 60 * 1000;
  *  5. Everything else shows.
  */
 export function shouldShowLead(lead: Lead, now: Date = new Date()): boolean {
+  // Not interested leads should remain accessible in All Leads,
+  // but should not return to the follow-up dashboard queue.
+  if (lead.status === 'not_interested') return false;
+
   if (lead.permanentlyHidden) return false;
 
   if (lead.hiddenUntil && now < new Date(lead.hiddenUntil)) return false;

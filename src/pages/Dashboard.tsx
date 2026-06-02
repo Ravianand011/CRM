@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { AlertCircle, Clock, Users, TrendingUp } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
-import type { Lead } from '../types/Lead';
+import type { Lead, LeadStatus } from '../types/Lead';
+import { LEAD_STATUSES, STATUS_LABELS } from '../types/Lead';
 import type { DemoReminder } from '../hooks/useNotifications';
 import { buildQueue, isOverdue } from '../utils/scheduler';
 import { FollowUpQueue } from '../components/FollowUpQueue';
@@ -17,12 +18,13 @@ interface DashboardProps {
   onSelectReminder: (leadId: string) => void;
 }
 
-type QueueFilter = 'all' | 'not_picked' | 'switch_off' | 'scheduled';
+type QueueFilter = 'all' | 'scheduled' | LeadStatus;
 
 const FILTERS: { id: QueueFilter; label: string }[] = [
   { id: 'all', label: 'All' },
-  { id: 'not_picked', label: 'Not picked' },
-  { id: 'switch_off', label: 'Switch off' },
+  ...LEAD_STATUSES
+    .filter((s) => s !== 'not_interested')
+    .map((s) => ({ id: s as QueueFilter, label: STATUS_LABELS[s] })),
   { id: 'scheduled', label: 'Scheduled' },
 ];
 
@@ -52,16 +54,9 @@ export function Dashboard({
   }, [leads, queue, now]);
 
   const filtered = useMemo(() => {
-    switch (filter) {
-      case 'not_picked':
-        return queue.filter((l) => l.status === 'not_picked');
-      case 'switch_off':
-        return queue.filter((l) => l.status === 'switch_off');
-      case 'scheduled':
-        return queue.filter((l) => !!l.nextFollowUp);
-      default:
-        return queue;
-    }
+    if (filter === 'all') return queue;
+    if (filter === 'scheduled') return queue.filter((l) => !!l.nextFollowUp);
+    return queue.filter((l) => l.status === filter);
   }, [queue, filter]);
 
   return (

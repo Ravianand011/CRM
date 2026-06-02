@@ -32,12 +32,19 @@ export function FollowUpQueue({
     );
   }
 
-  const phoneCounts = leads.reduce<Record<string, number>>((acc, lead) => {
+  // Mark only repeated occurrences as duplicate:
+  // first lead for a phone = normal, subsequent leads = duplicate.
+  const seenPhones = new Set<string>();
+  const duplicateLeadIds = new Set<string>();
+  for (const lead of leads) {
     const key = normalizePhone(lead.phone);
-    if (!key) return acc;
-    acc[key] = (acc[key] ?? 0) + 1;
-    return acc;
-  }, {});
+    if (!key) continue;
+    if (seenPhones.has(key)) {
+      duplicateLeadIds.add(lead.id);
+    } else {
+      seenPhones.add(key);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-2">
@@ -47,10 +54,7 @@ export function FollowUpQueue({
           lead={lead}
           onEdit={onEdit}
           onDelete={onDelete}
-          isDuplicate={
-            !!normalizePhone(lead.phone) &&
-            (phoneCounts[normalizePhone(lead.phone)] ?? 0) > 1
-          }
+          isDuplicate={duplicateLeadIds.has(lead.id)}
         />
       ))}
     </div>
