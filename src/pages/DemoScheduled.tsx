@@ -5,9 +5,10 @@ import { FollowUpQueue } from '../components/FollowUpQueue';
 interface DemoScheduledProps {
   leads: Lead[];
   onEdit: (lead: Lead) => void;
+  onDelete: (lead: Lead) => void;
 }
 
-export function DemoScheduled({ leads, onEdit }: DemoScheduledProps) {
+export function DemoScheduled({ leads, onEdit, onDelete }: DemoScheduledProps) {
   const demos = useMemo(
     () =>
       leads
@@ -31,6 +32,7 @@ export function DemoScheduled({ leads, onEdit }: DemoScheduledProps) {
       <FollowUpQueue
         leads={demos}
         onEdit={onEdit}
+        onDelete={onDelete}
         emptyMessage="No demos scheduled yet."
       />
     </div>

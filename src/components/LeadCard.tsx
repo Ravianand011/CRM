@@ -2,6 +2,7 @@ import {
   Calendar,
   CalendarCheck2,
   Clock,
+  Trash2,
   Import,
   GraduationCap,
   History,
@@ -25,6 +26,8 @@ import { isDueToday, isOverdue } from '../utils/scheduler';
 interface LeadCardProps {
   lead: Lead;
   onEdit: (lead: Lead) => void;
+  onDelete?: (lead: Lead) => void;
+  isDuplicate?: boolean;
 }
 
 const WHATSAPP_TEMPLATE = (name: string) =>
@@ -67,7 +70,7 @@ function ordinal(n: number): string {
 const lbtn =
   'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px] font-medium';
 
-export function LeadCard({ lead, onEdit }: LeadCardProps) {
+export function LeadCard({ lead, onEdit, onDelete, isDuplicate }: LeadCardProps) {
   const overdue = isOverdue(lead);
   const dueToday = !overdue && isDueToday(lead);
 
@@ -126,6 +129,11 @@ export function LeadCard({ lead, onEdit }: LeadCardProps) {
             {isFb && (
               <span className="inline-flex items-center gap-1 rounded-[10px] bg-tone-gray-bg px-2 py-0.5 text-[10px] font-medium text-tone-gray-tx">
                 <Import size={10} /> FB import
+              </span>
+            )}
+            {isDuplicate && (
+              <span className="rounded-[10px] bg-tone-red-bg px-2 py-0.5 text-[10px] font-medium text-tone-red-tx">
+                Duplicate
               </span>
             )}
           </div>
@@ -227,6 +235,18 @@ export function LeadCard({ lead, onEdit }: LeadCardProps) {
         >
           <Save size={13} /> Save + schedule
         </button>
+        {onDelete && (
+          <button
+            type="button"
+            onClick={() => {
+              const ok = window.confirm(`Delete lead: ${lead.name}?`);
+              if (ok) onDelete(lead);
+            }}
+            className={`${lbtn} border-tone-red-tx/30 bg-tone-red-bg text-tone-red-tx`}
+          >
+            <Trash2 size={13} /> Delete
+          </button>
+        )}
       </div>
     </div>
   );

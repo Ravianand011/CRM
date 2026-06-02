@@ -24,8 +24,17 @@ const TITLES: Record<View, string> = {
 };
 
 function App() {
-  const { leads, loading, mode, switchMode, save, importRows, backup, refresh } =
-    useLeads();
+  const {
+    leads,
+    loading,
+    mode,
+    switchMode,
+    save,
+    importRows,
+    backup,
+    refresh,
+    remove,
+  } = useLeads();
   const { pullLeads } = useWebhookSync(refresh);
   const { reminders, count } = useNotifications(leads);
   const { now } = useFollowUpScheduler();
@@ -62,6 +71,10 @@ function App() {
   const openEdit = (lead: Lead) => {
     setEditing(lead);
     setFormOpen(true);
+  };
+
+  const deleteLead = async (lead: Lead) => {
+    await remove(lead.id);
   };
 
   const navigate = (v: View) => {
@@ -134,17 +147,23 @@ function App() {
                   now={now}
                   reminders={reminders}
                   onEdit={openEdit}
+                  onDelete={deleteLead}
                   onSelectReminder={openReminderLead}
                 />
               )}
               {view === 'all' && (
-                <AllLeads leads={leads} search={search} onEdit={openEdit} />
+                <AllLeads
+                  leads={leads}
+                  search={search}
+                  onEdit={openEdit}
+                  onDelete={deleteLead}
+                />
               )}
               {view === 'demo' && (
-                <DemoScheduled leads={leads} onEdit={openEdit} />
+                <DemoScheduled leads={leads} onEdit={openEdit} onDelete={deleteLead} />
               )}
               {view === 'converted' && (
-                <Converted leads={leads} onEdit={openEdit} />
+                <Converted leads={leads} onEdit={openEdit} onDelete={deleteLead} />
               )}
               {view === 'import' && <ImportLeads onImport={importRows} />}
             </>

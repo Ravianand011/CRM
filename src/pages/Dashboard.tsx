@@ -13,6 +13,7 @@ interface DashboardProps {
   now: Date;
   reminders: DemoReminder[];
   onEdit: (lead: Lead) => void;
+  onDelete: (lead: Lead) => void;
   onSelectReminder: (leadId: string) => void;
 }
 
@@ -30,6 +31,7 @@ export function Dashboard({
   now,
   reminders,
   onEdit,
+  onDelete,
   onSelectReminder,
 }: DashboardProps) {
   const [filter, setFilter] = useState<QueueFilter>('all');
@@ -118,6 +120,7 @@ export function Dashboard({
         <FollowUpQueue
           leads={filtered}
           onEdit={onEdit}
+          onDelete={onDelete}
           emptyMessage="No leads due right now. Great job staying on top of it!"
         />
       </div>

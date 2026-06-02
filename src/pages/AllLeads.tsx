@@ -8,12 +8,13 @@ interface AllLeadsProps {
   leads: Lead[];
   search: string;
   onEdit: (lead: Lead) => void;
+  onDelete: (lead: Lead) => void;
 }
 
 const selectClass =
   'rounded-md border border-line-2 bg-surface px-3 py-1.5 text-[13px] text-ink outline-none focus:border-brand-border';
 
-export function AllLeads({ leads, search, onEdit }: AllLeadsProps) {
+export function AllLeads({ leads, search, onEdit, onDelete }: AllLeadsProps) {
   const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all');
   const [sort, setSort] = useState<SortKey>('createdAt');
 
@@ -74,6 +75,7 @@ export function AllLeads({ leads, search, onEdit }: AllLeadsProps) {
       <FollowUpQueue
         leads={filtered}
         onEdit={onEdit}
+        onDelete={onDelete}
         emptyMessage="No leads match your search/filter."
       />
     </div>

@@ -5,9 +5,10 @@ import { FollowUpQueue } from '../components/FollowUpQueue';
 interface ConvertedProps {
   leads: Lead[];
   onEdit: (lead: Lead) => void;
+  onDelete: (lead: Lead) => void;
 }
 
-export function Converted({ leads, onEdit }: ConvertedProps) {
+export function Converted({ leads, onEdit, onDelete }: ConvertedProps) {
   const won = useMemo(
     () =>
       leads
@@ -30,6 +31,7 @@ export function Converted({ leads, onEdit }: ConvertedProps) {
       <FollowUpQueue
         leads={won}
         onEdit={onEdit}
+        onDelete={onDelete}
         emptyMessage="No converted leads yet."
       />
     </div>
