@@ -1,30 +1,26 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import type { Lead } from '../types/Lead';
 import { normalizePhone } from '../utils/phone';
 import { isLeadBlocked } from '../utils/syncBlocklist';
-import {
-  getDataMode,
-  readLeads,
-  setDataMode,
-  writeLeads,
-} from '../utils/storage';
+import { readRealLeads, readStoredMode, writeRealLeads } from '../utils/storage';
 
 const WEBHOOK_SERVER =
   import.meta.env.VITE_WEBHOOK_URL ||
   'https://crm-production-be3b.up.railway.app';
 
 export function useWebhookSync(onSynced?: () => void) {
-  const pullLeads = useCallback(async () => {
-    const prevMode = getDataMode();
+  const [syncing, setSyncing] = useState(false);
+
+  const pullLeads = useCallback(async (options?: { refreshUi?: boolean }) => {
+    const manual = options?.refreshUi === true;
+    if (manual) setSyncing(true);
     try {
       const base = WEBHOOK_SERVER.replace(/\/$/, '');
       const res = await fetch(`${base}/leads`);
       if (!res.ok) return;
 
       const serverLeads: Lead[] = await res.json();
-
-      setDataMode('real');
-      const existing = readLeads();
+      const existing = readRealLeads();
 
       const existingPhones = new Set(
         existing.map((l) => normalizePhone(l.phone)).filter(Boolean),
@@ -45,7 +41,7 @@ export function useWebhookSync(onSynced?: () => void) {
 
       const toAdd = brandNew.filter((l) => !isLeadBlocked(l));
       if (toAdd.length > 0) {
-        writeLeads([...toAdd, ...existing]);
+        writeRealLeads([...toAdd, ...existing]);
         console.log(`${toAdd.length} new lead(s) synced from server`);
 
         window.dispatchEvent(
@@ -53,14 +49,18 @@ export function useWebhookSync(onSynced?: () => void) {
             detail: { count: toAdd.length, leads: toAdd },
           }),
         );
-
-        onSynced?.();
       }
 
+      const shouldRefreshUi =
+        readStoredMode() === 'real' &&
+        (toAdd.length > 0 || options?.refreshUi === true);
+      if (shouldRefreshUi) {
+        await onSynced?.();
+      }
     } catch (err) {
       console.log('Webhook server not reachable:', err);
     } finally {
-      setDataMode(prevMode);
+      if (manual) setSyncing(false);
     }
   }, [onSynced]);
 
@@ -70,5 +70,5 @@ export function useWebhookSync(onSynced?: () => void) {
     return () => clearInterval(interval);
   }, [pullLeads]);
 
-  return { pullLeads };
+  return { pullLeads, syncing };
 }

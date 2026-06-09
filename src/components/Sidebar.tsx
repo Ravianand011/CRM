@@ -24,6 +24,7 @@ interface SidebarProps {
   onNewLead: () => void;
   onExport: () => void;
   onRefreshLeads?: () => void;
+  refreshingLeads?: boolean;
 }
 
 type BadgeTone = 'red' | 'green';
@@ -92,6 +93,7 @@ export function Sidebar({
   onNewLead,
   onExport,
   onRefreshLeads,
+  refreshingLeads = false,
 }: SidebarProps) {
   return (
     <aside className="flex h-full w-[210px] shrink-0 flex-col border-r border-line bg-surface py-4">
@@ -139,10 +141,15 @@ export function Sidebar({
         {onRefreshLeads && (
           <button
             type="button"
+            disabled={refreshingLeads}
             onClick={() => void onRefreshLeads()}
-            className="flex w-full items-center justify-center gap-2 rounded-md border border-line-2 px-3 py-2 text-[12px] font-medium text-ink-2 hover:bg-surface-2"
+            className="flex w-full items-center justify-center gap-2 rounded-md border border-line-2 px-3 py-2 text-[12px] font-medium text-ink-2 hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <RefreshCw size={14} /> Refresh leads
+            <RefreshCw
+              size={14}
+              className={refreshingLeads ? 'animate-spin' : ''}
+            />
+            {refreshingLeads ? 'Refreshing...' : 'Refresh leads'}
           </button>
         )}
         <button

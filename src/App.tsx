@@ -38,7 +38,7 @@ function App() {
     refresh,
     remove,
   } = useLeads();
-  const { pullLeads } = useWebhookSync(refresh);
+  const { pullLeads, syncing } = useWebhookSync(refresh);
   const { reminders, count } = useNotifications(leads);
   const { now } = useFollowUpScheduler();
   const { theme, toggleTheme } = useTheme();
@@ -126,7 +126,8 @@ function App() {
             openNew();
           }}
           onExport={() => void backup()}
-          onRefreshLeads={() => void pullLeads()}
+          onRefreshLeads={() => void pullLeads({ refreshUi: true })}
+          refreshingLeads={syncing}
         />
       </div>
 

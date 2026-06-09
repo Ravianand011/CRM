@@ -27,9 +27,10 @@ export function shouldShowLead(lead: Lead, now: Date = new Date()): boolean {
   }
 
   if (lead.status === 'not_picked' || lead.status === 'switch_off') {
-    const lastShown = lead.lastShownAt
-      ? new Date(lead.lastShownAt)
-      : new Date(lead.updatedAt);
+    // Never shown in queue yet (e.g. new FB import) — show immediately.
+    if (!lead.lastShownAt) return true;
+
+    const lastShown = new Date(lead.lastShownAt);
     const elapsed = now.getTime() - lastShown.getTime();
 
     if (lead.missedCallCount === 0) return elapsed >= 24 * HOUR_MS;

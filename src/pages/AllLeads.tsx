@@ -85,12 +85,23 @@ export function AllLeads({
         </div>
       </div>
 
+      {leads.length === 0 && (
+        <p className="mb-3 rounded-md border border-line bg-surface-2 px-3 py-2 text-[12px] text-ink-2">
+          No leads loaded. Make sure <strong>Real</strong> mode is selected in
+          the top bar, then click <strong>Refresh leads</strong> in the sidebar.
+        </p>
+      )}
+
       <FollowUpQueue
         leads={filtered}
         allLeads={leads}
         onEdit={onEdit}
         onDelete={onDelete}
-        emptyMessage="No leads match your search/filter."
+        emptyMessage={
+          leads.length === 0
+            ? 'No leads in your database yet.'
+            : 'No leads match your search/filter.'
+        }
       />
     </div>
   );

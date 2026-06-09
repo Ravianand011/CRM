@@ -201,6 +201,14 @@ export function Dashboard({
           </div>
         )}
 
+        {filtered.length === 0 && leads.length > 0 && filter === 'all' && (
+          <p className="mb-2 rounded-md border border-line bg-surface-2 px-3 py-2 text-[12px] text-ink-2">
+            You have {leads.length} lead(s) in the database, but none are due
+            in today&apos;s queue (hidden by status, schedule, or follow-up
+            timing). Open <strong>All Leads</strong> to see everything.
+          </p>
+        )}
+
         <FollowUpQueue
           leads={filtered}
           allLeads={leads}
@@ -212,7 +220,9 @@ export function Dashboard({
           emptyMessage={
             filter === 'duplicates'
               ? 'No duplicate leads found.'
-              : 'No leads due right now. Great job staying on top of it!'
+              : leads.length === 0
+                ? 'No leads yet. Use Refresh leads in the sidebar or import from Facebook.'
+                : 'No leads due right now. Great job staying on top of it!'
           }
         />
       </div>

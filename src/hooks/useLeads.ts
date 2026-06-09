@@ -32,6 +32,7 @@ export function useLeads() {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
+    setDataMode(getDataMode());
     const data = await getLeads();
     setLeads(data);
   }, []);

@@ -26,10 +26,9 @@ export function writeStoredMode(mode: DataMode): void {
   localStorage.setItem(MODE_KEY, mode);
 }
 
-/** Read all leads from the active dataset. */
-export function readLeads(): Lead[] {
+function readLeadsFromKey(key: string): Lead[] {
   try {
-    const raw = localStorage.getItem(activeKey);
+    const raw = localStorage.getItem(key);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -39,13 +38,31 @@ export function readLeads(): Lead[] {
   }
 }
 
-/** Persist the full leads array to the active dataset. */
-export function writeLeads(leads: Lead[]): void {
+function writeLeadsToKey(key: string, leads: Lead[]): void {
   try {
-    localStorage.setItem(activeKey, JSON.stringify(leads));
+    localStorage.setItem(key, JSON.stringify(leads));
   } catch (err) {
     console.error('Failed to save leads to localStorage', err);
   }
+}
+
+/** Read all leads from the active dataset. */
+export function readLeads(): Lead[] {
+  return readLeadsFromKey(activeKey);
+}
+
+/** Persist the full leads array to the active dataset. */
+export function writeLeads(leads: Lead[]): void {
+  writeLeadsToKey(activeKey, leads);
+}
+
+/** Read/write real leads without changing the active dataset pointer. */
+export function readRealLeads(): Lead[] {
+  return readLeadsFromKey(REAL_KEY);
+}
+
+export function writeRealLeads(leads: Lead[]): void {
+  writeLeadsToKey(REAL_KEY, leads);
 }
 
 /** Trigger a download of all leads as a JSON backup file. */
