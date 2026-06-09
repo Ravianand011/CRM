@@ -10,7 +10,30 @@ const fetch = require('node-fetch');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const leadsStore = [];
+const LEADS_FILE = path.join(__dirname, 'leads.json');
+
+function readLeadsFromFile() {
+  try {
+    if (!fs.existsSync(LEADS_FILE)) return [];
+    const raw = fs.readFileSync(LEADS_FILE, 'utf8');
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    console.error('Failed to read leads.json:', err.message);
+    return [];
+  }
+}
+
+function persistLeadsToFile(leads) {
+  try {
+    fs.writeFileSync(LEADS_FILE, JSON.stringify(leads, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Failed to write leads.json:', err.message);
+  }
+}
+
+const leadsStore = readLeadsFromFile();
+console.log(`Loaded ${leadsStore.length} lead(s) from ${LEADS_FILE}`);
 
 const FIELD_MAP = {
   full_name: 'name',
@@ -103,6 +126,7 @@ function removeLeadsFromStore({ id, phone, fbLeadId }) {
       removed += 1;
     }
   }
+  if (removed > 0) persistLeadsToFile(leadsStore);
   return removed;
 }
 
@@ -112,6 +136,7 @@ function saveLead(lead) {
     return false;
   }
   leadsStore.push(lead);
+  persistLeadsToFile(leadsStore);
   console.log(`Lead saved: ${lead.name} - ${lead.phone}`);
   return true;
 }
@@ -308,7 +333,7 @@ app.post('/webhook', (req, res) => {
 });
 
 app.get('/leads', (_req, res) => {
-  res.json(leadsStore);
+  res.json(readLeadsFromFile());
 });
 
 app.delete('/leads/:id', (req, res) => {
