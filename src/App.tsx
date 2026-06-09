@@ -1,14 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { Lead } from './types/Lead';
 import type { View } from './types/navigation';
 import { useLeads } from './hooks/useLeads';
-import { useWebhookSync } from './hooks/useWebhookSync';
 import { useNotifications } from './hooks/useNotifications';
 import { useFollowUpScheduler } from './hooks/useFollowUpScheduler';
 import { useTheme } from './hooks/useTheme';
 import { buildQueue } from './utils/scheduler';
-import { deleteLeadOnServer } from './services/serverLeads';
-import { markLeadDeleted } from './utils/syncBlocklist';
 import { Sidebar } from './components/Sidebar';
 import { Navbar } from './components/Navbar';
 import { LeadForm } from './components/LeadForm';
@@ -30,6 +27,8 @@ function App() {
   const {
     leads,
     loading,
+    refreshing,
+    error,
     mode,
     switchMode,
     save,
@@ -37,26 +36,18 @@ function App() {
     backup,
     refresh,
     remove,
+    migrate,
   } = useLeads();
-  const { pullLeads, syncing } = useWebhookSync(refresh);
   const { reminders, count } = useNotifications(leads);
   const { now } = useFollowUpScheduler();
   const { theme, toggleTheme } = useTheme();
-
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent<{ count: number }>).detail;
-      alert(`${detail.count} new Facebook leads received!`);
-    };
-    window.addEventListener('newLeadsReceived', handler);
-    return () => window.removeEventListener('newLeadsReceived', handler);
-  }, []);
 
   const [view, setView] = useState<View>('dashboard');
   const [search, setSearch] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Lead | null>(null);
+  const [migrating, setMigrating] = useState(false);
 
   const navCounts = useMemo(
     () => ({
@@ -78,12 +69,6 @@ function App() {
   };
 
   const deleteLead = async (lead: Lead) => {
-    try {
-      markLeadDeleted(lead);
-    } catch (err) {
-      console.error('Failed to cache deleted lead in blocklist', err);
-    }
-    void deleteLeadOnServer(lead);
     await remove(lead.id);
   };
 
@@ -102,6 +87,44 @@ function App() {
     const lead = leads.find((l) => l.id === leadId);
     if (lead) openEdit(lead);
   };
+
+  const handleMigrate = async () => {
+    const stored = localStorage.getItem('crm_leads');
+    const count = stored ? JSON.parse(stored).length : 0;
+    if (count === 0) {
+      alert('No leads found in localStorage');
+      return;
+    }
+    if (
+      !confirm(
+        `Migrate ${count} leads from localStorage to MongoDB? This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+    setMigrating(true);
+    try {
+      const result = await migrate();
+      alert(
+        `Migration complete!\nInserted: ${result.inserted}\nSkipped: ${result.skipped}\nTotal: ${result.total}`,
+      );
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Migration failed');
+    } finally {
+      setMigrating(false);
+    }
+  };
+
+  const storedLeadCount = (() => {
+    try {
+      const raw = localStorage.getItem('crm_leads');
+      if (!raw) return 0;
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.length : 0;
+    } catch {
+      return 0;
+    }
+  })();
 
   return (
     <div className="flex h-screen overflow-hidden bg-page">
@@ -126,8 +149,15 @@ function App() {
             openNew();
           }}
           onExport={() => void backup()}
-          onRefreshLeads={() => void pullLeads({ refreshUi: true })}
-          refreshingLeads={syncing}
+          onRefreshLeads={() => void refresh()}
+          refreshingLeads={refreshing}
+          onMigrate={mode === 'real' && storedLeadCount > 0 ? handleMigrate : undefined}
+          migrating={migrating}
+          migrateLabel={
+            storedLeadCount > 0
+              ? `Migrate ${storedLeadCount} leads to MongoDB`
+              : undefined
+          }
         />
       </div>
 
@@ -148,6 +178,12 @@ function App() {
           onMenuToggle={() => setSidebarOpen((v) => !v)}
         />
 
+        {error && (
+          <div className="border-b border-alert-border bg-alert-bg px-5 py-1.5 text-center text-[12px] font-medium text-alert-tx">
+            {error}
+          </div>
+        )}
+
         {mode === 'demo' && (
           <div className="border-b border-alert-border bg-alert-bg px-5 py-1.5 text-center text-[12px] font-medium text-alert-tx">
             Demo mode - showing sample data. Switch to "Real" in the top bar for
@@ -157,7 +193,10 @@ function App() {
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-5">
           {loading ? (
-            <p className="text-ink-3">Loading...</p>
+            <div className="flex items-center justify-center gap-2 py-16 text-ink-3">
+              <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-brand border-t-transparent" />
+              Loading leads...
+            </div>
           ) : (
             <>
               {view === 'dashboard' && (

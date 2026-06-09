@@ -1,6 +1,7 @@
 import {
   CalendarCheck2,
   CheckCircle2,
+  Database,
   Megaphone,
   LayoutDashboard,
   Plus,
@@ -25,6 +26,9 @@ interface SidebarProps {
   onExport: () => void;
   onRefreshLeads?: () => void;
   refreshingLeads?: boolean;
+  onMigrate?: () => void;
+  migrating?: boolean;
+  migrateLabel?: string;
 }
 
 type BadgeTone = 'red' | 'green';
@@ -94,6 +98,9 @@ export function Sidebar({
   onExport,
   onRefreshLeads,
   refreshingLeads = false,
+  onMigrate,
+  migrating = false,
+  migrateLabel,
 }: SidebarProps) {
   return (
     <aside className="flex h-full w-[210px] shrink-0 flex-col border-r border-line bg-surface py-4">
@@ -150,6 +157,17 @@ export function Sidebar({
               className={refreshingLeads ? 'animate-spin' : ''}
             />
             {refreshingLeads ? 'Refreshing...' : 'Refresh leads'}
+          </button>
+        )}
+        {onMigrate && migrateLabel && (
+          <button
+            type="button"
+            disabled={migrating}
+            onClick={() => void onMigrate()}
+            className="flex w-full items-center justify-center gap-2 rounded-md border border-brand-border bg-brand-soft px-3 py-2 text-[12px] font-medium text-brand-dark hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Database size={14} className={migrating ? 'animate-pulse' : ''} />
+            {migrating ? 'Migrating...' : migrateLabel}
           </button>
         )}
         <button

@@ -1,6 +1,12 @@
 import type { CallNote, Lead, LeadSource, LeadStatus } from '../types/Lead';
 import type { ParsedLeadRow } from '../utils/excelMapper';
-import { downloadBackup, readLeads, writeLeads } from '../utils/storage';
+import { leadsApi, type ApiLead } from '../api/leadsApi';
+import {
+  downloadBackup,
+  getDataMode,
+  readLeads,
+  writeLeads,
+} from '../utils/storage';
 
 const HOUR_MS = 60 * 60 * 1000;
 const MISSED_STATUSES: LeadStatus[] = ['not_picked', 'switch_off'];
@@ -16,9 +22,9 @@ export interface LeadFormData {
   status: LeadStatus;
   nextFollowUp?: string;
   demoScheduledAt?: string;
-  comment?: string; // appended to call history on save
+  comment?: string;
   source?: LeadSource;
-  createdAt?: string; // ISO — new leads only; edits keep original
+  createdAt?: string;
 }
 
 export interface SearchFilters {
@@ -46,6 +52,60 @@ function hiddenWindowMs(missedCount: number): number {
   if (missedCount <= 0) return 24 * HOUR_MS;
   if (missedCount === 1) return 48 * HOUR_MS;
   return 72 * HOUR_MS;
+}
+
+export function normalizeApiLead(doc: ApiLead): Lead {
+  return {
+    id: doc.id || doc._id,
+    fbLeadId: doc.fbLeadId,
+    name: doc.name || '',
+    phone: doc.phone || '',
+    email: doc.email,
+    qualification: doc.qualification || '',
+    city: doc.city || '',
+    whenPlanningToJoin: doc.whenPlanningToJoin,
+    source: (doc.source as LeadSource) || 'manual',
+    status: doc.status as LeadStatus,
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt,
+    nextFollowUp: doc.nextFollowUp,
+    demoScheduledAt: doc.demoScheduledAt,
+    hiddenUntil: doc.hiddenUntil,
+    lastShownAt: doc.lastShownAt,
+    missedCallCount: doc.missedCallCount ?? 0,
+    permanentlyHidden: doc.permanentlyHidden ?? false,
+    callHistory: (doc.callHistory || []).map((n, i) => ({
+      id: n.id || `note_${i}`,
+      note: n.note || '',
+      statusAtTime: n.statusAtTime as LeadStatus,
+      timestamp: n.timestamp,
+    })),
+  };
+}
+
+function leadToApiPayload(lead: Lead): Partial<ApiLead> {
+  return {
+    fbLeadId: lead.fbLeadId,
+    name: lead.name,
+    phone: lead.phone,
+    email: lead.email,
+    city: lead.city,
+    qualification: lead.qualification,
+    whenPlanningToJoin: lead.whenPlanningToJoin,
+    source: lead.source,
+    status: lead.status,
+    missedCallCount: lead.missedCallCount,
+    permanentlyHidden: lead.permanentlyHidden,
+    nextFollowUp: lead.nextFollowUp,
+    demoScheduledAt: lead.demoScheduledAt,
+    hiddenUntil: lead.hiddenUntil,
+    lastShownAt: lead.lastShownAt,
+    callHistory: lead.callHistory.map(({ note, statusAtTime, timestamp }) => ({
+      note,
+      statusAtTime,
+      timestamp,
+    })),
+  };
 }
 
 /**
@@ -94,14 +154,12 @@ export function computeSavedLead(
   base.updatedAt = nowIso;
   if (form.source) base.source = form.source;
 
-  // Missed-call re-show cadence.
   if (MISSED_STATUSES.includes(newStatus)) {
     const wasMissed = prevStatus
       ? MISSED_STATUSES.includes(prevStatus)
       : false;
     if (wasMissed) base.missedCallCount = (prev?.missedCallCount ?? 0) + 1;
     base.lastShownAt = nowIso;
-    // An explicit follow-up time takes priority over the auto timer.
     base.hiddenUntil = base.nextFollowUp
       ? undefined
       : new Date(now.getTime() + hiddenWindowMs(base.missedCallCount)).toISOString();
@@ -115,7 +173,6 @@ export function computeSavedLead(
     base.nextFollowUp = undefined;
   }
 
-  // Append the current comment to the call history timeline.
   const comment = form.comment?.trim();
   if (comment) {
     const note: CallNote = {
@@ -131,63 +188,89 @@ export function computeSavedLead(
   return base;
 }
 
-// --- Internal API (localStorage-backed). Async-style so a real backend can
-// drop in later without touching callers. ---
-
 export async function getLeads(): Promise<Lead[]> {
-  return readLeads();
+  if (getDataMode() === 'demo') {
+    return readLeads();
+  }
+  const docs = await leadsApi.getAll();
+  return docs.map(normalizeApiLead);
 }
 
 export async function getLead(id: string): Promise<Lead | undefined> {
-  return readLeads().find((l) => l.id === id);
+  const leads = await getLeads();
+  return leads.find((l) => l.id === id);
 }
 
-/** Create or update a lead from form data. Returns the saved lead. */
 export async function saveLead(
   form: LeadFormData,
   existingId?: string,
 ): Promise<Lead> {
-  const leads = readLeads();
-  const prev = existingId ? leads.find((l) => l.id === existingId) ?? null : null;
+  if (getDataMode() === 'demo') {
+    const leads = readLeads();
+    const prev = existingId
+      ? leads.find((l) => l.id === existingId) ?? null
+      : null;
+    const saved = computeSavedLead(prev, form);
+    const next = prev
+      ? leads.map((l) => (l.id === saved.id ? saved : l))
+      : [saved, ...leads];
+    writeLeads(next);
+    return saved;
+  }
+
+  const all = await getLeads();
+  const prev = existingId
+    ? all.find((l) => l.id === existingId) ?? null
+    : null;
   const saved = computeSavedLead(prev, form);
+  const payload = leadToApiPayload(saved);
 
-  const next = prev
-    ? leads.map((l) => (l.id === saved.id ? saved : l))
-    : [saved, ...leads];
+  if (prev) {
+    const updated = await leadsApi.update(saved.id, payload);
+    return normalizeApiLead(updated);
+  }
 
-  writeLeads(next);
-  return saved;
+  const created = await leadsApi.create(payload);
+  return normalizeApiLead(created);
 }
 
-/** Patch arbitrary fields on a lead (low-level update). */
 export async function updateLead(
   id: string,
   patch: Partial<Lead>,
 ): Promise<Lead | undefined> {
-  const leads = readLeads();
-  let updated: Lead | undefined;
-  const next = leads.map((l) => {
-    if (l.id !== id) return l;
-    updated = { ...l, ...patch, updatedAt: new Date().toISOString() };
+  if (getDataMode() === 'demo') {
+    const leads = readLeads();
+    let updated: Lead | undefined;
+    const next = leads.map((l) => {
+      if (l.id !== id) return l;
+      updated = { ...l, ...patch, updatedAt: new Date().toISOString() };
+      return updated;
+    });
+    writeLeads(next);
     return updated;
+  }
+
+  const updated = await leadsApi.update(id, {
+    ...patch,
+    updatedAt: new Date().toISOString(),
   });
-  writeLeads(next);
-  return updated;
+  return normalizeApiLead(updated);
 }
 
 export async function deleteLead(id: string): Promise<void> {
-  writeLeads(readLeads().filter((l) => l.id !== id));
+  if (getDataMode() === 'demo') {
+    writeLeads(readLeads().filter((l) => l.id !== id));
+    return;
+  }
+  await leadsApi.delete(id);
 }
 
-/** Import parsed spreadsheet rows, skipping phone-number duplicates. */
 export async function bulkImport(
   rows: ParsedLeadRow[],
   meta?: Pick<ImportResult, 'matchedColumns' | 'ignoredColumns'>,
 ): Promise<ImportResult> {
-  const leads = readLeads();
-  const existingPhones = new Set(
-    leads.map((l) => l.phone).filter(Boolean),
-  );
+  const leads = await getLeads();
+  const existingPhones = new Set(leads.map((l) => l.phone).filter(Boolean));
 
   let imported = 0;
   let duplicates = 0;
@@ -215,13 +298,28 @@ export async function bulkImport(
       missedCallCount: 0,
       permanentlyHidden: false,
     };
-    additions.push(lead);
+
+    if (getDataMode() === 'real') {
+      try {
+        const created = await leadsApi.create(leadToApiPayload(lead));
+        additions.push(normalizeApiLead(created));
+      } catch {
+        duplicates += 1;
+        continue;
+      }
+    } else {
+      additions.push(lead);
+    }
+
     if (row.phone) existingPhones.add(row.phone);
     imported += 1;
   }
 
-  const next = [...additions, ...leads];
-  writeLeads(next);
+  if (getDataMode() === 'demo') {
+    writeLeads([...additions, ...leads]);
+  }
+
+  const next = getDataMode() === 'demo' ? [...additions, ...leads] : await getLeads();
   return {
     imported,
     duplicates,
@@ -231,14 +329,13 @@ export async function bulkImport(
   };
 }
 
-/** Search + filter + sort leads (used by the All Leads page). */
 export async function searchLeads(
   query: string,
   filters: SearchFilters = {},
   sort: SortKey = 'createdAt',
 ): Promise<Lead[]> {
   const q = query.trim().toLowerCase();
-  let result = readLeads();
+  let result = await getLeads();
 
   if (q) {
     result = result.filter((l) =>
@@ -282,7 +379,21 @@ export function sortLeads(leads: Lead[], sort: SortKey): Lead[] {
   }
 }
 
-/** Download all leads as a JSON backup file. */
 export async function exportBackup(): Promise<void> {
-  downloadBackup(readLeads());
+  downloadBackup(await getLeads());
+}
+
+export async function migrateFromLocalStorage(): Promise<{
+  inserted: number;
+  skipped: number;
+  total: number;
+}> {
+  const raw = localStorage.getItem('crm_leads');
+  const leads = raw ? JSON.parse(raw) : [];
+  if (!Array.isArray(leads) || leads.length === 0) {
+    throw new Error('No leads found in localStorage');
+  }
+  const result = await leadsApi.migrate(leads);
+  localStorage.removeItem('crm_leads');
+  return result;
 }
