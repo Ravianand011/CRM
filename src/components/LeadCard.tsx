@@ -28,6 +28,9 @@ interface LeadCardProps {
   onEdit: (lead: Lead) => void;
   onDelete?: (lead: Lead) => Promise<void> | void;
   isDuplicate?: boolean;
+  selectable?: boolean;
+  selected?: boolean;
+  onSelectChange?: () => void;
 }
 
 const WHATSAPP_TEMPLATE = (name: string) =>
@@ -75,6 +78,9 @@ export function LeadCard({
   onEdit,
   onDelete,
   isDuplicate,
+  selectable = false,
+  selected = false,
+  onSelectChange,
 }: LeadCardProps) {
   const overdue = isOverdue(lead);
   const dueToday = !overdue && isDueToday(lead);
@@ -112,6 +118,15 @@ export function LeadCard({
       className={`rounded-lg border border-line bg-surface p-3.5 ${accent}`}
     >
       <div className="flex items-start gap-2.5">
+        {selectable && (
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={() => onSelectChange?.()}
+            className="mt-2.5 h-4 w-4 shrink-0 rounded border-line-2 accent-brand"
+            aria-label={`Select ${lead.name}`}
+          />
+        )}
         <div
           className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-medium ${toneFor(
             lead.id,

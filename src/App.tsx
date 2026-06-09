@@ -5,6 +5,7 @@ import { useLeads } from './hooks/useLeads';
 import { useWebhookSync } from './hooks/useWebhookSync';
 import { useNotifications } from './hooks/useNotifications';
 import { useFollowUpScheduler } from './hooks/useFollowUpScheduler';
+import { useTheme } from './hooks/useTheme';
 import { buildQueue } from './utils/scheduler';
 import { deleteLeadOnServer } from './services/serverLeads';
 import { markLeadDeleted } from './utils/syncBlocklist';
@@ -40,6 +41,7 @@ function App() {
   const { pullLeads } = useWebhookSync(refresh);
   const { reminders, count } = useNotifications(leads);
   const { now } = useFollowUpScheduler();
+  const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -81,9 +83,14 @@ function App() {
     } catch (err) {
       console.error('Failed to cache deleted lead in blocklist', err);
     }
-    // Best-effort server cleanup; do not block local delete.
     void deleteLeadOnServer(lead);
     await remove(lead.id);
+  };
+
+  const bulkDeleteLeads = async (toDelete: Lead[]) => {
+    for (const lead of toDelete) {
+      await deleteLead(lead);
+    }
   };
 
   const navigate = (v: View) => {
@@ -134,6 +141,8 @@ function App() {
           notificationCount={count}
           mode={mode}
           onModeChange={(m) => void switchMode(m)}
+          theme={theme}
+          onThemeToggle={toggleTheme}
           onBellClick={() => navigate('demo')}
           onMenuToggle={() => setSidebarOpen((v) => !v)}
         />
@@ -157,6 +166,7 @@ function App() {
                   reminders={reminders}
                   onEdit={openEdit}
                   onDelete={deleteLead}
+                  onBulkDelete={bulkDeleteLeads}
                   onSelectReminder={openReminderLead}
                 />
               )}

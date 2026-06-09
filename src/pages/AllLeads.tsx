@@ -2,7 +2,10 @@ import { useMemo, useState } from 'react';
 import type { Lead, LeadStatus } from '../types/Lead';
 import { LEAD_STATUSES, STATUS_LABELS } from '../types/Lead';
 import { sortLeads, type SortKey } from '../services/leadsApi';
+import { getDuplicateLeads } from '../utils/duplicates';
 import { FollowUpQueue } from '../components/FollowUpQueue';
+
+type StatusFilter = LeadStatus | 'all' | 'duplicates';
 
 interface AllLeadsProps {
   leads: Lead[];
@@ -20,7 +23,8 @@ export function AllLeads({
   onEdit,
   onDelete,
 }: AllLeadsProps) {
-  const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const duplicateCount = useMemo(() => getDuplicateLeads(leads).length, [leads]);
   const [sort, setSort] = useState<SortKey>('createdAt');
 
   const filtered = useMemo(() => {
@@ -35,7 +39,10 @@ export function AllLeads({
           .includes(q),
       );
     }
-    if (statusFilter !== 'all') {
+    if (statusFilter === 'duplicates') {
+      const dupIds = new Set(getDuplicateLeads(leads).map((l) => l.id));
+      result = result.filter((l) => dupIds.has(l.id));
+    } else if (statusFilter !== 'all') {
       result = result.filter((l) => l.status === statusFilter);
     }
     return sortLeads(result, sort);
@@ -55,10 +62,11 @@ export function AllLeads({
             className={selectClass}
             value={statusFilter}
             onChange={(e) =>
-              setStatusFilter(e.target.value as LeadStatus | 'all')
+              setStatusFilter(e.target.value as StatusFilter)
             }
           >
             <option value="all">All statuses</option>
+            <option value="duplicates">Duplicates ({duplicateCount})</option>
             {LEAD_STATUSES.map((s) => (
               <option key={s} value={s}>
                 {STATUS_LABELS[s]}
@@ -79,6 +87,7 @@ export function AllLeads({
 
       <FollowUpQueue
         leads={filtered}
+        allLeads={leads}
         onEdit={onEdit}
         onDelete={onDelete}
         emptyMessage="No leads match your search/filter."

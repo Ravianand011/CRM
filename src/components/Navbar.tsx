@@ -1,4 +1,5 @@
-import { Bell, Menu, Search } from 'lucide-react';
+import { Bell, Menu, Moon, Search, Sun } from 'lucide-react';
+import type { Theme } from '../hooks/useTheme';
 import type { DataMode } from '../utils/storage';
 
 interface NavbarProps {
@@ -8,6 +9,8 @@ interface NavbarProps {
   notificationCount: number;
   mode: DataMode;
   onModeChange: (mode: DataMode) => void;
+  theme: Theme;
+  onThemeToggle: () => void;
   onBellClick: () => void;
   onMenuToggle: () => void;
 }
@@ -24,6 +27,8 @@ export function Navbar({
   notificationCount,
   mode,
   onModeChange,
+  theme,
+  onThemeToggle,
   onBellClick,
   onMenuToggle,
 }: NavbarProps) {
@@ -68,6 +73,17 @@ export function Navbar({
       </div>
 
       <button
+        type="button"
+        onClick={onThemeToggle}
+        className="rounded-md p-1.5 text-ink-2 hover:bg-surface-2"
+        aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+        title={theme === 'light' ? 'Dark mode' : 'Light mode'}
+      >
+        {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+      </button>
+
+      <button
+        type="button"
         onClick={onBellClick}
         className="relative rounded-md p-1.5 text-ink-2 hover:bg-surface-2"
         aria-label="Notifications"

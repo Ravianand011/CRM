@@ -64,3 +64,44 @@ body {
     Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+
+html.dark {
+  --color-page: #0f1419;
+  --color-surface: #1a2332;
+  --color-surface-2: #243044;
+  --color-ink: #e8edf2;
+  --color-ink-2: #a8b5c0;
+  --color-ink-3: #6b7a86;
+  --color-line: #2d3a4a;
+  --color-line-2: #3d4f63;
+
+  --color-brand: #5ba3e8;
+  --color-brand-dark: #9ecbf5;
+  --color-brand-soft: #1a3050;
+  --color-brand-border: #3d7ab8;
+
+  --color-tone-gray-bg: #2a2f38;
+  --color-tone-gray-tx: #c5c9ce;
+  --color-tone-blue-bg: #1a3050;
+  --color-tone-blue-tx: #9ecbf5;
+  --color-tone-amber-bg: #3d3018;
+  --color-tone-amber-tx: #f0c060;
+  --color-tone-green-bg: #1e3318;
+  --color-tone-green-tx: #8fd060;
+  --color-tone-red-bg: #3d1e1e;
+  --color-tone-red-tx: #f08080;
+  --color-tone-purple-bg: #2a2548;
+  --color-tone-purple-tx: #b0a8f0;
+
+  --color-av-blue-bg: #1a3050;
+  --color-av-blue-tx: #9ecbf5;
+  --color-av-teal-bg: #1a3830;
+  --color-av-teal-tx: #60d0b0;
+  --color-av-purple-bg: #2a2548;
+  --color-av-purple-tx: #b0a8f0;
+
+  --color-alert-bg: #3d3018;
+  --color-alert-border: #c08020;
+  --color-alert-tx: #f0c060;
+  --color-alert-sub: #d0a040;
+}
