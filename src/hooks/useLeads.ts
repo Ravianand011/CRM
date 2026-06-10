@@ -10,6 +10,7 @@ import {
   type DataMode,
 } from '../utils/storage';
 import { buildDemoLeads } from '../utils/demoData';
+import { leadsApi } from '../api/leadsApi';
 import {
   bulkImport,
   deleteLead,
@@ -35,7 +36,9 @@ export function useLeads() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [syncingFacebook, setSyncingFacebook] = useState(false);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const facebookSyncStarted = useRef(false);
 
   const fetchLeads = useCallback(async (opts?: { initial?: boolean }) => {
     const isInitial = opts?.initial ?? false;
@@ -86,6 +89,32 @@ export function useLeads() {
     }, REFRESH_MS);
     return () => clearInterval(interval);
   }, [mode, fetchLeads]);
+
+  const syncFacebook = useCallback(async () => {
+    if (getDataMode() !== 'real') return null;
+    setSyncingFacebook(true);
+    try {
+      const result = await leadsApi.syncFacebook();
+      await refresh();
+      setError(null);
+      return result;
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Facebook sync failed';
+      setError(message);
+      throw err;
+    } finally {
+      setSyncingFacebook(false);
+    }
+  }, [refresh]);
+
+  useEffect(() => {
+    if (mode !== 'real' || loading || facebookSyncStarted.current) return;
+    facebookSyncStarted.current = true;
+    void syncFacebook().catch(() => {
+      // Error surfaced via `error` state; user can retry with the button.
+    });
+  }, [mode, loading, syncFacebook]);
 
   const switchMode = useCallback(
     async (next: DataMode) => {
@@ -152,10 +181,12 @@ export function useLeads() {
     leads,
     loading,
     refreshing,
+    syncingFacebook,
     error,
     mode,
     switchMode,
     refresh,
+    syncFacebook,
     save,
     patch,
     remove,

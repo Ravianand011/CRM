@@ -39,6 +39,18 @@ export interface MigrateResult {
   total: number;
 }
 
+export interface SyncFacebookResult {
+  success: boolean;
+  added: number;
+  skipped: number;
+  filtered: number;
+  forms: number;
+  total: number;
+  pageId?: string;
+  syncFrom: string;
+  error?: string;
+}
+
 async function parseError(res: Response): Promise<string> {
   try {
     const body = await res.json();
@@ -90,5 +102,16 @@ export const leadsApi = {
     });
     if (!res.ok) throw new Error(await parseError(res));
     return res.json();
+  },
+
+  syncFacebook: async (): Promise<SyncFacebookResult> => {
+    const res = await fetch(`${BASE_URL}/sync-facebook`, {
+      method: 'POST',
+    });
+    const body = await res.json();
+    if (!res.ok) {
+      throw new Error(body.error || 'Facebook sync failed');
+    }
+    return body;
   },
 };

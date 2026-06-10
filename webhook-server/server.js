@@ -1,6 +1,28 @@
+const crypto = require('crypto');
 const express = require('express');
 const mongoose = require('mongoose');
 require('dotenv').config();
+
+const DEFAULT_SYNC_FROM = '2026-05-25T00:00:00.000Z';
+const SYNC_FROM_MS = new Date(
+  process.env.FB_SYNC_FROM || DEFAULT_SYNC_FROM,
+).getTime();
+
+const FIELD_MAP = {
+  full_name: 'name',
+  name: 'name',
+  first_name: 'firstName',
+  last_name: 'lastName',
+  phone_number: 'phone',
+  phone: 'phone',
+  mobile: 'phone',
+  contact_number: 'phone',
+  email: 'email',
+  city: 'city',
+  what_is_your_qualification: 'qualification',
+  qualification: 'qualification',
+  when_are_you_planning_to_join: 'whenPlanningToJoin',
+};
 
 const app = express();
 app.use(express.json());
@@ -73,6 +95,127 @@ function normalizePhone(phone) {
   return digits;
 }
 
+function flattenFieldData(fieldData) {
+  const result = {};
+  if (!Array.isArray(fieldData)) return result;
+
+  for (const field of fieldData) {
+    const key = FIELD_MAP[field.name];
+    if (key && field.values && field.values[0]) {
+      result[key] = field.values[0];
+    }
+  }
+
+  if (!result.name && (result.firstName || result.lastName)) {
+    result.name = [result.firstName, result.lastName].filter(Boolean).join(' ');
+  }
+
+  return result;
+}
+
+function getAppSecretProof(accessToken) {
+  const secret = process.env.FB_APP_SECRET;
+  if (!secret || !accessToken) return null;
+  return crypto.createHmac('sha256', secret).update(accessToken).digest('hex');
+}
+
+function graphApiUrl(path, query = {}) {
+  const token = process.env.FB_PAGE_ACCESS_TOKEN?.trim();
+  if (!token) throw new Error('FB_PAGE_ACCESS_TOKEN not set');
+  const params = new URLSearchParams();
+  Object.entries(query).forEach(([k, v]) => params.set(k, String(v)));
+  params.set('access_token', token);
+  const proof = getAppSecretProof(token);
+  if (proof) params.set('appsecret_proof', proof);
+  return `https://graph.facebook.com/v19.0/${path}?${params}`;
+}
+
+function withAppSecretProof(url) {
+  const token = process.env.FB_PAGE_ACCESS_TOKEN?.trim();
+  const proof = getAppSecretProof(token);
+  if (!proof) return url;
+  const u = new URL(url);
+  if (!u.searchParams.has('appsecret_proof')) {
+    u.searchParams.set('appsecret_proof', proof);
+  }
+  return u.toString();
+}
+
+async function graphGet(url) {
+  const res = await fetch(withAppSecretProof(url));
+  const data = await res.json();
+  if (!res.ok) {
+    const msg = data.error?.message || JSON.stringify(data);
+    throw new Error(msg);
+  }
+  return data;
+}
+
+async function fetchAllPages(firstUrl) {
+  const items = [];
+  let url = withAppSecretProof(firstUrl);
+  while (url) {
+    const data = await graphGet(url);
+    if (Array.isArray(data.data)) items.push(...data.data);
+    url = data.paging?.next ? withAppSecretProof(data.paging.next) : null;
+  }
+  return items;
+}
+
+function buildLeadDataFromGraph(data) {
+  const leadgenId = String(data.id);
+  const fields = flattenFieldData(data.field_data);
+  const createdAt = data.created_time
+    ? new Date(data.created_time)
+    : new Date();
+
+  return {
+    fbLeadId: leadgenId,
+    name: fields.name || 'Facebook Lead',
+    phone: fields.phone || '',
+    email: fields.email || '',
+    city: fields.city || '',
+    qualification: fields.qualification || '',
+    whenPlanningToJoin: fields.whenPlanningToJoin || '',
+    source: 'facebook',
+    status: 'not_picked',
+    missedCallCount: 0,
+    fbAdName: data.ad_name || '',
+    fbCampaignName: data.campaign_name || '',
+    createdAt,
+    updatedAt: createdAt,
+  };
+}
+
+function isOnOrAfterSyncFrom(createdTime) {
+  if (!createdTime) return true;
+  return new Date(createdTime).getTime() >= SYNC_FROM_MS;
+}
+
+async function upsertFbLeadFromGraph(data, { enforceDateFilter = false } = {}) {
+  if (enforceDateFilter && !isOnOrAfterSyncFrom(data.created_time)) {
+    return { action: 'filtered' };
+  }
+
+  const leadData = buildLeadDataFromGraph(data);
+  const existing = await Lead.findOne({ fbLeadId: leadData.fbLeadId });
+  if (existing) {
+    return { action: 'skipped', lead: existing };
+  }
+
+  if (leadData.phone) {
+    const phoneKey = normalizePhone(leadData.phone);
+    if (phoneKey) {
+      const matches = await Lead.find({ phone: { $ne: '' } });
+      const dup = matches.find((l) => normalizePhone(l.phone) === phoneKey);
+      if (dup) return { action: 'skipped', lead: dup };
+    }
+  }
+
+  const lead = await Lead.create(leadData);
+  return { action: 'added', lead };
+}
+
 function serializeLead(doc) {
   const obj = doc.toObject ? doc.toObject() : doc;
   return {
@@ -98,58 +241,91 @@ function serializeLead(doc) {
 
 async function fetchAndSaveLead(leadgenId) {
   try {
-    const token = process.env.FB_PAGE_ACCESS_TOKEN?.trim();
-    const url = `https://graph.facebook.com/v19.0/${leadgenId}?fields=id,created_time,field_data,ad_name,campaign_name&access_token=${token}`;
+    const url = graphApiUrl(leadgenId, {
+      fields: 'id,created_time,field_data,ad_name,campaign_name',
+    });
     console.log('🔍 Fetching lead:', leadgenId);
-    const response = await fetch(url);
-    const data = await response.json();
+    const data = await graphGet(url);
     console.log('📊 FB Response:', JSON.stringify(data));
 
-    const fields = {};
-    (data.field_data || []).forEach((f) => {
-      fields[f.name] = f.values ? f.values[0] : '';
-    });
-
-    const leadData = {
-      fbLeadId: leadgenId,
-      name: fields.full_name || fields.name || '',
-      phone: fields.phone_number || fields.phone || '',
-      email: fields.email || '',
-      city: fields.city || '',
-      qualification: fields.what_is_your_qualification || fields.qualification || '',
-      whenPlanningToJoin: fields.when_are_you_planning_to_join || '',
-      source: 'facebook',
-      status: 'not_picked',
-      missedCallCount: 0,
-      fbAdName: data.ad_name || '',
-      fbCampaignName: data.campaign_name || '',
-    };
-
-    const saved = await Lead.findOneAndUpdate(
-      { fbLeadId: leadgenId },
-      { $setOnInsert: leadData },
-      { upsert: true, new: true, setDefaultsOnInsert: true },
-    );
-    console.log('✅ Lead saved to MongoDB:', saved.name, saved.phone);
+    const result = await upsertFbLeadFromGraph(data, { enforceDateFilter: false });
+    if (result.action === 'added') {
+      console.log('✅ Lead saved to MongoDB:', result.lead.name, result.lead.phone);
+    } else if (result.action === 'skipped') {
+      console.log('⏭️ Lead already exists:', leadgenId);
+    }
   } catch (err) {
     console.log('❌ fetchAndSaveLead error:', err.message);
     try {
-      await Lead.findOneAndUpdate(
-        { fbLeadId: leadgenId },
-        {
-          $setOnInsert: {
-            fbLeadId: leadgenId,
-            name: 'Facebook Lead',
-            source: 'facebook',
-            status: 'not_picked',
-          },
-        },
-        { upsert: true, new: true, setDefaultsOnInsert: true },
-      );
+      const existing = await Lead.findOne({ fbLeadId: leadgenId });
+      if (!existing) {
+        await Lead.create({
+          fbLeadId: leadgenId,
+          name: 'Facebook Lead',
+          source: 'facebook',
+          status: 'not_picked',
+        });
+      }
     } catch (e) {
       console.log('❌ fallback save failed:', e.message);
     }
   }
+}
+
+async function syncAllLeadsFromFacebook() {
+  const token = process.env.FB_PAGE_ACCESS_TOKEN?.trim();
+  if (!token) {
+    throw new Error('FB_PAGE_ACCESS_TOKEN not set in Railway variables');
+  }
+
+  let pageId = process.env.FB_PAGE_ID?.trim();
+  if (!pageId) {
+    const me = await graphGet(graphApiUrl('me', { fields: 'id' }));
+    pageId = me.id;
+  }
+
+  const forms = await fetchAllPages(
+    graphApiUrl(`${pageId}/leadgen_forms`, {
+      fields: 'id,name',
+      limit: '100',
+    }),
+  );
+
+  let added = 0;
+  let skipped = 0;
+  let filtered = 0;
+
+  for (const form of forms) {
+    console.log(`📋 Syncing form: ${form.name || form.id}`);
+    const rows = await fetchAllPages(
+      graphApiUrl(`${form.id}/leads`, {
+        fields: 'id,created_time,field_data,ad_name,campaign_name',
+        limit: '100',
+      }),
+    );
+
+    for (const row of rows) {
+      const result = await upsertFbLeadFromGraph(row, { enforceDateFilter: true });
+      if (result.action === 'added') added += 1;
+      else if (result.action === 'skipped') skipped += 1;
+      else if (result.action === 'filtered') filtered += 1;
+    }
+  }
+
+  const total = await Lead.countDocuments();
+  console.log(
+    `✅ Facebook sync: ${added} added, ${skipped} skipped, ${filtered} before ${process.env.FB_SYNC_FROM || DEFAULT_SYNC_FROM}, ${forms.length} form(s), ${total} total`,
+  );
+
+  return {
+    added,
+    skipped,
+    filtered,
+    forms: forms.length,
+    total,
+    pageId,
+    syncFrom: process.env.FB_SYNC_FROM || DEFAULT_SYNC_FROM,
+  };
 }
 
 app.get('/webhook', (req, res) => {
@@ -290,6 +466,16 @@ app.delete('/leads', async (req, res) => {
   }
 });
 
+app.post('/sync-facebook', async (_req, res) => {
+  try {
+    const result = await syncAllLeadsFromFacebook();
+    res.json({ success: true, ...result });
+  } catch (err) {
+    console.error('sync-facebook error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.post('/migrate-leads', async (req, res) => {
   try {
     const leads = req.body.leads || [];
@@ -417,7 +603,7 @@ const hasDashboard = fs.existsSync(indexHtml);
 
 if (hasDashboard) {
   app.use(express.static(distPath, { index: 'index.html' }));
-  app.get(/^\/(?!webhook|health|leads|test-lead|migrate-leads).*/, (_req, res) => {
+  app.get(/^\/(?!webhook|health|leads|test-lead|migrate-leads|sync-facebook).*/, (_req, res) => {
     res.sendFile(indexHtml);
   });
 } else {
@@ -432,5 +618,6 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('📦 MongoDB URI set:', !!process.env.MONGODB_URI);
   console.log('🔑 VERIFY_TOKEN set:', !!process.env.VERIFY_TOKEN);
   console.log('📘 FB_PAGE_ACCESS_TOKEN set:', !!process.env.FB_PAGE_ACCESS_TOKEN);
+  console.log('📅 FB sync from:', process.env.FB_SYNC_FROM || DEFAULT_SYNC_FROM);
   if (hasDashboard) console.log('CRM dashboard served from /dist');
 });

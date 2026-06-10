@@ -35,6 +35,8 @@ function App() {
     importRows,
     backup,
     refresh,
+    syncFacebook,
+    syncingFacebook,
     remove,
     migrate,
   } = useLeads();
@@ -86,6 +88,19 @@ function App() {
   const openReminderLead = (leadId: string) => {
     const lead = leads.find((l) => l.id === leadId);
     if (lead) openEdit(lead);
+  };
+
+  const handleSyncFacebook = async () => {
+    try {
+      const result = await syncFacebook();
+      if (result) {
+        alert(
+          `Facebook sync complete!\nAdded: ${result.added}\nSkipped (already in CRM): ${result.skipped}\nOlder than May 25 skipped: ${result.filtered}\nTotal in database: ${result.total}`,
+        );
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Facebook sync failed');
+    }
   };
 
   const handleMigrate = async () => {
@@ -149,6 +164,10 @@ function App() {
             openNew();
           }}
           onExport={() => void backup()}
+          onSyncFacebook={
+            mode === 'real' ? () => void handleSyncFacebook() : undefined
+          }
+          syncingFacebook={syncingFacebook}
           onRefreshLeads={() => void refresh()}
           refreshingLeads={refreshing}
           onMigrate={mode === 'real' && storedLeadCount > 0 ? handleMigrate : undefined}

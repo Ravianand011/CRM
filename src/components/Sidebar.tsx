@@ -9,6 +9,7 @@ import {
   Users,
   Download,
   RefreshCw,
+  CloudDownload,
 } from 'lucide-react';
 import type { View } from '../types/navigation';
 
@@ -26,6 +27,8 @@ interface SidebarProps {
   onExport: () => void;
   onRefreshLeads?: () => void;
   refreshingLeads?: boolean;
+  onSyncFacebook?: () => void;
+  syncingFacebook?: boolean;
   onMigrate?: () => void;
   migrating?: boolean;
   migrateLabel?: string;
@@ -98,6 +101,8 @@ export function Sidebar({
   onExport,
   onRefreshLeads,
   refreshingLeads = false,
+  onSyncFacebook,
+  syncingFacebook = false,
   onMigrate,
   migrating = false,
   migrateLabel,
@@ -145,6 +150,20 @@ export function Sidebar({
         >
           <Plus size={15} /> New Lead
         </button>
+        {onSyncFacebook && (
+          <button
+            type="button"
+            disabled={syncingFacebook}
+            onClick={() => void onSyncFacebook()}
+            className="flex w-full items-center justify-center gap-2 rounded-md border border-line-2 px-3 py-2 text-[12px] font-medium text-ink-2 hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <CloudDownload
+              size={14}
+              className={syncingFacebook ? 'animate-pulse' : ''}
+            />
+            {syncingFacebook ? 'Syncing Facebook...' : 'Sync Facebook'}
+          </button>
+        )}
         {onRefreshLeads && (
           <button
             type="button"
