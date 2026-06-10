@@ -1,5 +1,5 @@
-import type { LeadStatus } from '../types/Lead';
-import { STATUS_LABELS } from '../types/Lead';
+import type { Lead, LeadStatus } from '../types/Lead';
+import { STATUS_LABELS, isFreshLead } from '../types/Lead';
 
 const STATUS_CLASSES: Record<LeadStatus, string> = {
   not_picked: 'bg-tone-gray-bg text-tone-gray-tx',
@@ -11,7 +11,10 @@ const STATUS_CLASSES: Record<LeadStatus, string> = {
   switch_off: 'bg-tone-gray-bg text-tone-gray-tx',
 };
 
-export function StatusBadge({ status }: { status: LeadStatus }) {
+export function StatusBadge({ lead }: { lead: Lead }) {
+  if (isFreshLead(lead)) return null;
+
+  const { status } = lead;
   return (
     <span
       className={`inline-flex items-center whitespace-nowrap rounded-[10px] px-2 py-0.5 text-[11px] font-medium ${STATUS_CLASSES[status]}`}

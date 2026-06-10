@@ -64,3 +64,13 @@ export const STATUS_LABELS: Record<LeadStatus, string> = {
   not_interested: 'Not Interested',
   switch_off: 'Switch Off',
 };
+
+/** Untouched lead — never acted on, no call notes yet. */
+export function isFreshLead(lead: Lead): boolean {
+  return (
+    lead.status === 'not_picked' &&
+    !lead.lastShownAt &&
+    lead.callHistory.length === 0 &&
+    !lead.permanentlyHidden
+  );
+}

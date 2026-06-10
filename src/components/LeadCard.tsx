@@ -140,7 +140,7 @@ export function LeadCard({
             <span className="text-[14px] font-medium text-ink">
               {lead.name}
             </span>
-            <StatusBadge status={lead.status} />
+            <StatusBadge lead={lead} />
             {lead.missedCallCount > 0 && (
               <span className="rounded-[10px] bg-tone-amber-bg px-2 py-0.5 text-[10px] font-medium text-tone-amber-tx">
                 {ordinal(attempt)} attempt
