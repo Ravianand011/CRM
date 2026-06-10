@@ -272,17 +272,46 @@ async function fetchAndSaveLead(leadgenId) {
   }
 }
 
+let syncInFlight = false;
+let syncProgress = {
+  active: false,
+  percent: 0,
+  message: '',
+  added: 0,
+  skipped: 0,
+  filtered: 0,
+  processedForms: 0,
+  totalForms: 0,
+};
+
+function updateSyncProgress(patch) {
+  syncProgress = { ...syncProgress, ...patch };
+}
+
 async function syncAllLeadsFromFacebook() {
   const token = process.env.FB_PAGE_ACCESS_TOKEN?.trim();
   if (!token) {
     throw new Error('FB_PAGE_ACCESS_TOKEN not set in Railway variables');
   }
 
+  updateSyncProgress({
+    active: true,
+    percent: 2,
+    message: 'Connecting to Facebook...',
+    added: 0,
+    skipped: 0,
+    filtered: 0,
+    processedForms: 0,
+    totalForms: 0,
+  });
+
   let pageId = process.env.FB_PAGE_ID?.trim();
   if (!pageId) {
     const me = await graphGet(graphApiUrl('me', { fields: 'id' }));
     pageId = me.id;
   }
+
+  updateSyncProgress({ percent: 8, message: 'Loading lead forms...' });
 
   const forms = await fetchAllPages(
     graphApiUrl(`${pageId}/leadgen_forms`, {
@@ -295,8 +324,29 @@ async function syncAllLeadsFromFacebook() {
   let skipped = 0;
   let filtered = 0;
 
-  for (const form of forms) {
-    console.log(`📋 Syncing form: ${form.name || form.id}`);
+  updateSyncProgress({
+    totalForms: forms.length,
+    percent: 12,
+    message:
+      forms.length > 0
+        ? `Found ${forms.length} form(s). Starting sync...`
+        : 'No lead forms found on this Page.',
+  });
+
+  for (let formIndex = 0; formIndex < forms.length; formIndex += 1) {
+    const form = forms[formIndex];
+    const formLabel = form.name || `Form ${formIndex + 1}`;
+    console.log(`📋 Syncing form: ${formLabel}`);
+
+    updateSyncProgress({
+      processedForms: formIndex,
+      message: `Syncing ${formLabel} (${formIndex + 1}/${forms.length})...`,
+      percent: Math.round(12 + (formIndex / Math.max(forms.length, 1)) * 78),
+      added,
+      skipped,
+      filtered,
+    });
+
     const rows = await fetchAllPages(
       graphApiUrl(`${form.id}/leads`, {
         fields: 'id,created_time,field_data,ad_name,campaign_name',
@@ -304,12 +354,32 @@ async function syncAllLeadsFromFacebook() {
       }),
     );
 
-    for (const row of rows) {
+    for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+      const row = rows[rowIndex];
       const result = await upsertFbLeadFromGraph(row, { enforceDateFilter: true });
       if (result.action === 'added') added += 1;
       else if (result.action === 'skipped') skipped += 1;
       else if (result.action === 'filtered') filtered += 1;
+
+      if (rows.length > 0 && (rowIndex % 3 === 0 || rowIndex === rows.length - 1)) {
+        const formSpan = 78 / Math.max(forms.length, 1);
+        const withinForm = ((rowIndex + 1) / rows.length) * formSpan;
+        updateSyncProgress({
+          percent: Math.round(12 + formIndex * formSpan + withinForm),
+          message: `Processing ${formLabel}: lead ${rowIndex + 1} of ${rows.length}`,
+          added,
+          skipped,
+          filtered,
+        });
+      }
     }
+
+    updateSyncProgress({
+      processedForms: formIndex + 1,
+      added,
+      skipped,
+      filtered,
+    });
   }
 
   const total = await Lead.countDocuments();
@@ -466,13 +536,37 @@ app.delete('/leads', async (req, res) => {
   }
 });
 
+app.get('/sync-facebook/status', (_req, res) => {
+  res.json(syncProgress);
+});
+
 app.post('/sync-facebook', async (_req, res) => {
+  if (syncInFlight) {
+    return res.status(409).json({ success: false, error: 'Sync already in progress' });
+  }
+
+  syncInFlight = true;
   try {
     const result = await syncAllLeadsFromFacebook();
+    updateSyncProgress({
+      active: false,
+      percent: 100,
+      message: `Sync complete — ${result.added} added, ${result.total} total`,
+      added: result.added,
+      skipped: result.skipped,
+      filtered: result.filtered,
+    });
     res.json({ success: true, ...result });
   } catch (err) {
+    updateSyncProgress({
+      active: false,
+      percent: 0,
+      message: `Sync failed: ${err.message}`,
+    });
     console.error('sync-facebook error:', err.message);
     res.status(500).json({ success: false, error: err.message });
+  } finally {
+    syncInFlight = false;
   }
 });
 

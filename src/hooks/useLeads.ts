@@ -10,7 +10,7 @@ import {
   type DataMode,
 } from '../utils/storage';
 import { buildDemoLeads } from '../utils/demoData';
-import { leadsApi } from '../api/leadsApi';
+import { leadsApi, type SyncFacebookProgress } from '../api/leadsApi';
 import {
   bulkImport,
   deleteLead,
@@ -37,7 +37,11 @@ export function useLeads() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [syncingFacebook, setSyncingFacebook] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<SyncFacebookProgress | null>(
+    null,
+  );
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const syncPollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const facebookSyncStarted = useRef(false);
 
   const fetchLeads = useCallback(async (opts?: { initial?: boolean }) => {
@@ -79,6 +83,7 @@ export function useLeads() {
 
     return () => {
       if (retryTimer.current) clearTimeout(retryTimer.current);
+      if (syncPollTimer.current) clearInterval(syncPollTimer.current);
     };
   }, [fetchLeads]);
 
@@ -90,11 +95,37 @@ export function useLeads() {
     return () => clearInterval(interval);
   }, [mode, fetchLeads]);
 
+  const pollSyncProgress = useCallback(async () => {
+    try {
+      const status = await leadsApi.syncFacebookStatus();
+      setSyncProgress(status);
+    } catch {
+      // Keep last known progress while sync runs.
+    }
+  }, []);
+
   const syncFacebook = useCallback(async () => {
     if (getDataMode() !== 'real') return null;
     setSyncingFacebook(true);
+    setSyncProgress({
+      active: true,
+      percent: 0,
+      message: 'Starting Facebook sync...',
+      added: 0,
+      skipped: 0,
+      filtered: 0,
+      processedForms: 0,
+      totalForms: 0,
+    });
+
+    if (syncPollTimer.current) clearInterval(syncPollTimer.current);
+    syncPollTimer.current = setInterval(() => {
+      void pollSyncProgress();
+    }, 400);
+
     try {
       const result = await leadsApi.syncFacebook();
+      await pollSyncProgress();
       await refresh();
       setError(null);
       return result;
@@ -104,9 +135,14 @@ export function useLeads() {
       setError(message);
       throw err;
     } finally {
+      if (syncPollTimer.current) {
+        clearInterval(syncPollTimer.current);
+        syncPollTimer.current = null;
+      }
       setSyncingFacebook(false);
+      setTimeout(() => setSyncProgress(null), 2500);
     }
-  }, [refresh]);
+  }, [pollSyncProgress, refresh]);
 
   useEffect(() => {
     if (mode !== 'real' || loading || facebookSyncStarted.current) return;
@@ -182,6 +218,7 @@ export function useLeads() {
     loading,
     refreshing,
     syncingFacebook,
+    syncProgress,
     error,
     mode,
     switchMode,

@@ -4,6 +4,7 @@ import type { DataMode } from '../utils/storage';
 
 interface NavbarProps {
   title: string;
+  onTitleClick?: () => void;
   search: string;
   onSearchChange: (value: string) => void;
   notificationCount: number;
@@ -22,6 +23,7 @@ const MODES: { id: DataMode; label: string }[] = [
 
 export function Navbar({
   title,
+  onTitleClick,
   search,
   onSearchChange,
   notificationCount,
@@ -42,9 +44,20 @@ export function Navbar({
         <Menu size={18} />
       </button>
 
-      <h1 className="flex-1 truncate text-[15px] font-medium text-ink">
-        {title}
-      </h1>
+      {onTitleClick ? (
+        <button
+          type="button"
+          onClick={onTitleClick}
+          className="flex-1 truncate text-left text-[15px] font-medium text-ink transition hover:text-brand-dark"
+          title="Scroll to follow-up queue"
+        >
+          {title}
+        </button>
+      ) : (
+        <h1 className="flex-1 truncate text-[15px] font-medium text-ink">
+          {title}
+        </h1>
+      )}
 
       <div className="flex items-center gap-2 rounded-md border border-line bg-surface-2 px-3 py-1.5 text-ink-2 focus-within:border-brand-border">
         <Search size={15} />

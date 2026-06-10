@@ -21,15 +21,10 @@ interface DashboardProps {
 }
 
 type QueueFilter = 'all' | 'scheduled' | 'duplicates' | LeadStatus;
+type DateSort = 'newest' | 'oldest';
 
-const STATUS_FILTERS: { id: QueueFilter; label: string }[] = [
-  { id: 'all', label: 'All' },
-  ...LEAD_STATUSES.filter((s) => s !== 'not_interested').map((s) => ({
-    id: s as QueueFilter,
-    label: STATUS_LABELS[s],
-  })),
-  { id: 'scheduled', label: 'Scheduled' },
-];
+const selectClass =
+  'rounded-md border border-line-2 bg-surface px-3 py-1.5 text-[13px] text-ink outline-none focus:border-brand-border';
 
 export function Dashboard({
   leads,
@@ -41,22 +36,12 @@ export function Dashboard({
   onSelectReminder,
 }: DashboardProps) {
   const [filter, setFilter] = useState<QueueFilter>('all');
+  const [dateSort, setDateSort] = useState<DateSort>('newest');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const queue = useMemo(() => buildQueue(leads, now), [leads, now]);
   const duplicateLeads = useMemo(() => getDuplicateLeads(leads), [leads]);
-
-  const filters = useMemo(
-    () => [
-      ...STATUS_FILTERS,
-      {
-        id: 'duplicates' as const,
-        label: `Duplicates (${duplicateLeads.length})`,
-      },
-    ],
-    [duplicateLeads.length],
-  );
 
   const stats = useMemo(() => {
     const overdue = queue.filter((l) => isOverdue(l, now)).length;
@@ -72,15 +57,22 @@ export function Dashboard({
   }, [leads, queue, now]);
 
   const filtered = useMemo(() => {
-    if (filter === 'duplicates') return duplicateLeads;
-    if (filter === 'all') return queue;
-    if (filter === 'scheduled') return queue.filter((l) => !!l.nextFollowUp);
-    return queue.filter((l) => l.status === filter);
-  }, [queue, filter, duplicateLeads]);
+    let result: Lead[];
+    if (filter === 'duplicates') result = duplicateLeads;
+    else if (filter === 'all') result = queue;
+    else if (filter === 'scheduled') result = queue.filter((l) => !!l.nextFollowUp);
+    else result = queue.filter((l) => l.status === filter);
+
+    return [...result].sort((a, b) => {
+      const diff =
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      return dateSort === 'newest' ? diff : -diff;
+    });
+  }, [queue, filter, duplicateLeads, dateSort]);
 
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [filter]);
+  }, [filter, dateSort]);
 
   const toggleSelect = (leadId: string) => {
     setSelectedIds((prev) => {
@@ -122,6 +114,12 @@ export function Dashboard({
     }
   };
 
+  const scrollToQueue = () => {
+    document
+      .getElementById('follow-up-queue')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
@@ -130,6 +128,7 @@ export function Dashboard({
           value={queue.length}
           subIcon={Clock}
           subText={`${stats.overdue} overdue`}
+          onClick={scrollToQueue}
         />
         <StatCard
           label="Total leads"
@@ -155,24 +154,36 @@ export function Dashboard({
 
       <DemoNotification reminders={reminders} onSelect={onSelectReminder} />
 
-      <div>
+      <div id="follow-up-queue">
         <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-[14px] font-medium text-ink">Follow-up queue</h2>
-          <div className="flex flex-wrap gap-1.5">
-            {filters.map((f) => (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => setFilter(f.id)}
-                className={`rounded-full border px-2.5 py-1 text-[12px] ${
-                  filter === f.id
-                    ? 'border-brand-border bg-brand-soft font-medium text-brand-dark'
-                    : 'border-line-2 bg-surface text-ink-2 hover:bg-surface-2'
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
+          <div className="flex flex-wrap gap-2">
+            <select
+              className={selectClass}
+              value={filter}
+              onChange={(e) => setFilter(e.target.value as QueueFilter)}
+              aria-label="Filter by status"
+            >
+              <option value="all">All statuses</option>
+              <option value="scheduled">Scheduled follow-up</option>
+              <option value="duplicates">
+                Duplicates ({duplicateLeads.length})
+              </option>
+              {LEAD_STATUSES.filter((s) => s !== 'not_interested').map((s) => (
+                <option key={s} value={s}>
+                  {STATUS_LABELS[s]}
+                </option>
+              ))}
+            </select>
+            <select
+              className={selectClass}
+              value={dateSort}
+              onChange={(e) => setDateSort(e.target.value as DateSort)}
+              aria-label="Sort by date"
+            >
+              <option value="newest">Date: Newest first</option>
+              <option value="oldest">Date: Oldest first</option>
+            </select>
           </div>
         </div>
 
@@ -221,7 +232,7 @@ export function Dashboard({
             filter === 'duplicates'
               ? 'No duplicate leads found.'
               : leads.length === 0
-                ? 'No leads yet. Use Refresh leads in the sidebar or import from Facebook.'
+                ? 'No leads yet. Use Sync Facebook in the sidebar or Refresh leads.'
                 : 'No leads due right now. Great job staying on top of it!'
           }
         />

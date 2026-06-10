@@ -51,6 +51,17 @@ export interface SyncFacebookResult {
   error?: string;
 }
 
+export interface SyncFacebookProgress {
+  active: boolean;
+  percent: number;
+  message: string;
+  added: number;
+  skipped: number;
+  filtered: number;
+  processedForms: number;
+  totalForms: number;
+}
+
 async function parseError(res: Response): Promise<string> {
   try {
     const body = await res.json();
@@ -113,5 +124,11 @@ export const leadsApi = {
       throw new Error(body.error || 'Facebook sync failed');
     }
     return body;
+  },
+
+  syncFacebookStatus: async (): Promise<SyncFacebookProgress> => {
+    const res = await fetch(`${BASE_URL}/sync-facebook/status`);
+    if (!res.ok) throw new Error('Failed to fetch sync status');
+    return res.json();
   },
 };

@@ -8,6 +8,7 @@ import { useTheme } from './hooks/useTheme';
 import { buildQueue } from './utils/scheduler';
 import { Sidebar } from './components/Sidebar';
 import { Navbar } from './components/Navbar';
+import { SyncProgressBar } from './components/SyncProgressBar';
 import { LeadForm } from './components/LeadForm';
 import { Dashboard } from './pages/Dashboard';
 import { AllLeads } from './pages/AllLeads';
@@ -37,6 +38,7 @@ function App() {
     refresh,
     syncFacebook,
     syncingFacebook,
+    syncProgress,
     remove,
     migrate,
   } = useLeads();
@@ -130,6 +132,21 @@ function App() {
     }
   };
 
+  const scrollToFollowUpQueue = () => {
+    if (view !== 'dashboard') {
+      navigate('dashboard');
+      window.setTimeout(() => {
+        document
+          .getElementById('follow-up-queue')
+          ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 150);
+      return;
+    }
+    document
+      .getElementById('follow-up-queue')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   const storedLeadCount = (() => {
     try {
       const raw = localStorage.getItem('crm_leads');
@@ -183,6 +200,9 @@ function App() {
       <div className="flex min-w-0 flex-1 flex-col">
         <Navbar
           title={TITLES[view]}
+          onTitleClick={
+            view === 'dashboard' ? scrollToFollowUpQueue : undefined
+          }
           search={search}
           onSearchChange={(v) => {
             setSearch(v);
@@ -196,6 +216,10 @@ function App() {
           onBellClick={() => navigate('demo')}
           onMenuToggle={() => setSidebarOpen((v) => !v)}
         />
+
+        {syncingFacebook && syncProgress && (
+          <SyncProgressBar progress={syncProgress} />
+        )}
 
         {error && (
           <div className="border-b border-alert-border bg-alert-bg px-5 py-1.5 text-center text-[12px] font-medium text-alert-tx">
