@@ -2,40 +2,47 @@ import { isSameDay } from 'date-fns';
 import type { Lead } from '../types/Lead';
 
 const HOUR_MS = 60 * 60 * 1000;
+const MISSED_STATUSES = ['not_picked', 'switch_off'] as const;
 
 /**
  * Decide whether a lead should appear in the active follow-up queue.
  * Rules (in priority order):
- *  1. Permanently hidden leads never show.
- *  2. Leads hidden until a future time stay hidden.
- *  3. If a follow-up is scheduled, show only once that time has arrived.
- *  4. Otherwise, for not_picked / switch_off, re-show on a 24h/48h/72h
- *     cadence based on how many calls have been missed.
- *  5. Everything else shows.
+ *  1. Not interested / permanently hidden never show.
+ *  2. If a follow-up is scheduled, show only once that time has arrived.
+ *  3. Leads acted on (lastShownAt) without a follow-up stay hidden unless
+ *     they are not_picked / switch_off and their hide window has passed.
+ *  4. hiddenUntil blocks the lead until that time.
+ *  5. New not_picked / switch_off leads (no lastShownAt) show immediately.
  */
 export function shouldShowLead(lead: Lead, now: Date = new Date()): boolean {
-  // Not interested leads should remain accessible in All Leads,
-  // but should not return to the follow-up dashboard queue.
   if (lead.status === 'not_interested') return false;
-
   if (lead.permanentlyHidden) return false;
-
-  if (lead.hiddenUntil && now < new Date(lead.hiddenUntil)) return false;
 
   if (lead.nextFollowUp) {
     return now >= new Date(lead.nextFollowUp);
   }
 
+  if (
+    lead.lastShownAt &&
+    !MISSED_STATUSES.includes(lead.status as (typeof MISSED_STATUSES)[number])
+  ) {
+    return false;
+  }
+
+  if (lead.hiddenUntil && now < new Date(lead.hiddenUntil)) return false;
+
   if (lead.status === 'not_picked' || lead.status === 'switch_off') {
-    // Never shown in queue yet (e.g. new FB import) — show immediately.
     if (!lead.lastShownAt) return true;
 
-    const lastShown = new Date(lead.lastShownAt);
-    const elapsed = now.getTime() - lastShown.getTime();
+    const elapsed = now.getTime() - new Date(lead.lastShownAt).getTime();
+
+    if (lead.status === 'not_picked') {
+      return elapsed >= 24 * HOUR_MS;
+    }
 
     if (lead.missedCallCount === 0) return elapsed >= 24 * HOUR_MS;
     if (lead.missedCallCount === 1) return elapsed >= 48 * HOUR_MS;
-    return elapsed >= 72 * HOUR_MS; // missedCallCount >= 2
+    return elapsed >= 72 * HOUR_MS;
   }
 
   return true;

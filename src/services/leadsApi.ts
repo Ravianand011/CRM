@@ -154,25 +154,6 @@ export function computeSavedLead(
   base.updatedAt = nowIso;
   if (form.source) base.source = form.source;
 
-  if (MISSED_STATUSES.includes(newStatus)) {
-    const wasMissed = prevStatus
-      ? MISSED_STATUSES.includes(prevStatus)
-      : false;
-    if (wasMissed) base.missedCallCount = (prev?.missedCallCount ?? 0) + 1;
-    base.lastShownAt = nowIso;
-    base.hiddenUntil = base.nextFollowUp
-      ? undefined
-      : new Date(now.getTime() + hiddenWindowMs(base.missedCallCount)).toISOString();
-  } else {
-    base.hiddenUntil = undefined;
-  }
-
-  if (newStatus === 'not_interested') {
-    base.permanentlyHidden = true;
-    base.hiddenUntil = undefined;
-    base.nextFollowUp = undefined;
-  }
-
   const comment = form.comment?.trim();
   if (comment) {
     const note: CallNote = {
@@ -184,6 +165,43 @@ export function computeSavedLead(
     base.callHistory = [...base.callHistory, note];
   }
   base.currentComment = undefined;
+
+  if (newStatus === 'not_interested') {
+    base.permanentlyHidden = true;
+    base.hiddenUntil = undefined;
+    base.nextFollowUp = undefined;
+    if (prev) base.lastShownAt = nowIso;
+    return base;
+  }
+
+  // New leads stay visible on the dashboard until acted on.
+  if (!prev) return base;
+
+  // Any edit, comment, or action button dismisses the lead from today's queue.
+  base.lastShownAt = nowIso;
+
+  if (base.nextFollowUp) {
+    base.hiddenUntil = undefined;
+    return base;
+  }
+
+  if (newStatus === 'not_picked') {
+    if (prevStatus === 'not_picked') {
+      base.missedCallCount = (prev.missedCallCount ?? 0) + 1;
+    }
+    base.hiddenUntil = new Date(now.getTime() + 24 * HOUR_MS).toISOString();
+  } else if (newStatus === 'switch_off') {
+    const wasMissed = prevStatus
+      ? MISSED_STATUSES.includes(prevStatus)
+      : false;
+    if (wasMissed) base.missedCallCount = (prev.missedCallCount ?? 0) + 1;
+    base.hiddenUntil = new Date(
+      now.getTime() + hiddenWindowMs(base.missedCallCount),
+    ).toISOString();
+  } else {
+    // Picked, demo, converted, etc. — off dashboard until a follow-up is set.
+    base.hiddenUntil = undefined;
+  }
 
   return base;
 }

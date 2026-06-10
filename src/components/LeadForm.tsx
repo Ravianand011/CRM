@@ -250,7 +250,13 @@ export function LeadForm({ lead, onSave, onClose }: LeadFormProps) {
           </button>
           <button
             type="button"
-            onClick={() => submit()}
+            onClick={() => {
+              if (!nextFollowUp.trim()) {
+                setError('Please set a Next Follow-up date and time.');
+                return;
+              }
+              void submit();
+            }}
             disabled={saving}
             className="rounded-md border border-av-teal-tx/30 bg-av-teal-bg px-4 py-2 text-[13px] font-medium text-av-teal-tx hover:opacity-95 disabled:opacity-50"
           >
