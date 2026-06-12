@@ -1,4 +1,10 @@
-<!-- Paste this ENTIRE block into innobuzz.in (Custom HTML). Replace old form completely. -->
+<!-- CRM website form v4 — reCAPTCHA v3. Replace ALL old form HTML on innobuzz.in with this entire file. -->
+<script
+  src="https://www.google.com/recaptcha/api.js?render=6Lek1xotAAAAAL2fINsFwqIl3BXQloDL4Vn-6VEQ"
+  async
+  defer
+></script>
+
 <style type="text/css">
   #custom_form_error {
     color: #ff6b6b;
@@ -25,6 +31,9 @@
   #input_submit:disabled {
     opacity: 0.65;
     cursor: not-allowed;
+  }
+  .grecaptcha-badge {
+    visibility: hidden;
   }
 </style>
 
@@ -67,7 +76,7 @@
 
 <script>
   document.addEventListener("DOMContentLoaded", function () {
-    // Your CRM — all website inquiries go here (not connector.innobuzz.in)
+    var RECAPTCHA_SITE_KEY = "6Lek1xotAAAAAL2fINsFwqIl3BXQloDL4Vn-6VEQ";
     var CRM_SUBMIT_URL =
       "https://crm-production-be3b.up.railway.app/website-lead";
 
@@ -76,17 +85,32 @@
     var errorDiv = document.getElementById("custom_form_error");
     var submitBtn = document.getElementById("input_submit");
 
+    function submitLead(phone, recaptchaToken) {
+      return fetch(CRM_SUBMIT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: phone, recaptchaToken: recaptchaToken }),
+      }).then(function (response) {
+        return response.json().then(function (resData) {
+          return { ok: response.ok, data: resData };
+        });
+      });
+    }
+
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       messageDiv.textContent = "";
       errorDiv.textContent = "";
 
-      var formData = new FormData(form);
-      var data = Object.fromEntries(formData.entries());
-      var phone = (data.phone || "").trim();
-
+      var phone = (document.getElementById("input_phone").value || "").trim();
       if (!phone) {
         errorDiv.textContent = "Please enter your phone number.";
+        return;
+      }
+
+      if (typeof grecaptcha === "undefined") {
+        errorDiv.textContent =
+          "Could not load security check. Please refresh the page.";
         return;
       }
 
@@ -94,36 +118,34 @@
       var prevLabel = submitBtn.value;
       submitBtn.value = "Submitting...";
 
-      fetch(CRM_SUBMIT_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      })
-        .then(function (response) {
-          return response.json().then(function (resData) {
-            return { ok: response.ok, data: resData };
-          });
-        })
-        .then(function (result) {
-          if (result.ok && result.data.success !== false) {
-            messageDiv.textContent =
-              result.data.message || "Form submitted successfully!";
-            form.reset();
-          } else {
+      grecaptcha.ready(function () {
+        grecaptcha
+          .execute(RECAPTCHA_SITE_KEY, { action: "book_trial" })
+          .then(function (token) {
+            return submitLead(phone, token);
+          })
+          .then(function (result) {
+            if (result.ok && result.data.success !== false) {
+              messageDiv.textContent =
+                result.data.message || "Form submitted successfully!";
+              form.reset();
+            } else {
+              errorDiv.textContent =
+                result.data.message ||
+                result.data.error ||
+                "Something went wrong!";
+            }
+          })
+          .catch(function (err) {
+            console.error("Error:", err);
             errorDiv.textContent =
-              result.data.message ||
-              result.data.error ||
-              "Something went wrong!";
-          }
-        })
-        .catch(function (err) {
-          console.error("Error:", err);
-          errorDiv.textContent = "Network error. Please try again.";
-        })
-        .finally(function () {
-          submitBtn.disabled = false;
-          submitBtn.value = prevLabel;
-        });
+              "Could not verify submission. Please refresh and try again.";
+          })
+          .finally(function () {
+            submitBtn.disabled = false;
+            submitBtn.value = prevLabel;
+          });
+      });
     });
   });
 </script>
