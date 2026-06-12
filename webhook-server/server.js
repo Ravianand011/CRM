@@ -52,7 +52,7 @@ const leadSchema = new mongoose.Schema(
     source: {
       type: String,
       default: 'facebook',
-      enum: ['facebook', 'manual', 'excel_import'],
+      enum: ['facebook', 'manual', 'excel_import', 'website'],
     },
     status: {
       type: String,
@@ -93,6 +93,34 @@ function normalizePhone(phone) {
   if (!digits) return '';
   if (digits.length >= 10) return digits.slice(-10);
   return digits;
+}
+
+async function findDuplicateByPhone(phone) {
+  const phoneKey = normalizePhone(phone);
+  if (!phoneKey) return null;
+  const exact = await Lead.findOne({ phone: String(phone).trim() });
+  if (exact) return exact;
+  const matches = await Lead.find({ phone: { $ne: '' } });
+  return matches.find((l) => normalizePhone(l.phone) === phoneKey) || null;
+}
+
+async function verifyRecaptcha(token, remoteIp) {
+  const secret = process.env.RECAPTCHA_SECRET_KEY?.trim();
+  if (!secret) {
+    throw new Error('RECAPTCHA_SECRET_KEY not set in Railway variables');
+  }
+
+  const params = new URLSearchParams();
+  params.set('secret', secret);
+  params.set('response', token);
+  if (remoteIp) params.set('remoteip', remoteIp);
+
+  const res = await fetch('https://www.google.com/recaptcha/api/siteverify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params.toString(),
+  });
+  return res.json();
 }
 
 function flattenFieldData(fieldData) {
@@ -451,17 +479,9 @@ app.post('/leads', async (req, res) => {
     delete body.id;
 
     if (body.phone) {
-      const phoneKey = normalizePhone(body.phone);
-      const existing = await Lead.findOne({ phone: body.phone });
-      if (existing) {
+      const dup = await findDuplicateByPhone(body.phone);
+      if (dup) {
         return res.status(400).json({ error: 'Lead with this phone already exists' });
-      }
-      if (phoneKey) {
-        const all = await Lead.find({ phone: { $ne: '' } });
-        const dup = all.find((l) => normalizePhone(l.phone) === phoneKey);
-        if (dup) {
-          return res.status(400).json({ error: 'Lead with this phone already exists' });
-        }
       }
     }
 
@@ -475,6 +495,78 @@ app.post('/leads', async (req, res) => {
     } else {
       res.status(500).json({ error: err.message });
     }
+  }
+});
+
+app.post('/website-lead', async (req, res) => {
+  try {
+    const phone = String(req.body?.phone || '').trim();
+    const recaptchaToken = req.body?.recaptchaToken || req.body?.recaptcha_token;
+
+    if (!phone) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter your phone number.',
+      });
+    }
+
+    if (!recaptchaToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'CAPTCHA verification required. Please refresh and try again.',
+      });
+    }
+
+    const captcha = await verifyRecaptcha(
+      recaptchaToken,
+      req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip,
+    );
+
+    if (!captcha.success) {
+      console.log('❌ reCAPTCHA failed:', captcha['error-codes']);
+      return res.status(400).json({
+        success: false,
+        message: 'CAPTCHA verification failed. Please try again.',
+      });
+    }
+
+    const minScore = parseFloat(process.env.RECAPTCHA_MIN_SCORE || '0.5');
+    if (typeof captcha.score === 'number' && captcha.score < minScore) {
+      console.log('❌ reCAPTCHA low score:', captcha.score);
+      return res.status(400).json({
+        success: false,
+        message: 'Could not verify submission. Please try again.',
+      });
+    }
+
+    const duplicate = await findDuplicateByPhone(phone);
+    if (duplicate) {
+      return res.status(400).json({
+        success: false,
+        message: 'We already have your details. Our team will contact you soon.',
+      });
+    }
+
+    const lead = await Lead.create({
+      name: 'Website Lead',
+      phone,
+      source: 'website',
+      status: 'not_picked',
+      qualification: 'Book Trial - Website',
+    });
+
+    console.log('✅ Website lead created:', lead.phone);
+    res.json({
+      success: true,
+      message: 'Thank you! We will contact you shortly.',
+      lead: serializeLead(lead),
+    });
+  } catch (err) {
+    console.error('website-lead error:', err.message);
+    res.status(500).json({
+      success: false,
+      message: err.message || 'Something went wrong. Please try again.',
+    });
   }
 });
 
@@ -697,7 +789,7 @@ const hasDashboard = fs.existsSync(indexHtml);
 
 if (hasDashboard) {
   app.use(express.static(distPath, { index: 'index.html' }));
-  app.get(/^\/(?!webhook|health|leads|test-lead|migrate-leads|sync-facebook).*/, (_req, res) => {
+  app.get(/^\/(?!webhook|health|leads|test-lead|migrate-leads|sync-facebook|website-lead).*/, (_req, res) => {
     res.sendFile(indexHtml);
   });
 } else {
@@ -713,5 +805,6 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('🔑 VERIFY_TOKEN set:', !!process.env.VERIFY_TOKEN);
   console.log('📘 FB_PAGE_ACCESS_TOKEN set:', !!process.env.FB_PAGE_ACCESS_TOKEN);
   console.log('📅 FB sync from:', process.env.FB_SYNC_FROM || DEFAULT_SYNC_FROM);
+  console.log('🛡️ RECAPTCHA_SECRET_KEY set:', !!process.env.RECAPTCHA_SECRET_KEY);
   if (hasDashboard) console.log('CRM dashboard served from /dist');
 });

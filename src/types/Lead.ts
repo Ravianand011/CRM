@@ -7,7 +7,7 @@ export type LeadStatus =
   | 'not_interested'
   | 'switch_off';
 
-export type LeadSource = 'facebook' | 'excel_import' | 'manual';
+export type LeadSource = 'facebook' | 'excel_import' | 'manual' | 'website';
 
 export interface CallNote {
   id: string;

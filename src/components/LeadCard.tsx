@@ -102,6 +102,7 @@ export function LeadCard({
 
   const lastNote = lead.callHistory[lead.callHistory.length - 1];
   const isFb = lead.source === 'excel_import' || lead.source === 'facebook';
+  const isWebsite = lead.source === 'website';
   const attempt = lead.missedCallCount + 1;
 
   const overdueLabel = (() => {
@@ -149,6 +150,11 @@ export function LeadCard({
             {isFb && (
               <span className="inline-flex items-center gap-1 rounded-[10px] bg-tone-gray-bg px-2 py-0.5 text-[10px] font-medium text-tone-gray-tx">
                 <Import size={10} /> FB import
+              </span>
+            )}
+            {isWebsite && (
+              <span className="inline-flex items-center gap-1 rounded-[10px] bg-tone-blue-bg px-2 py-0.5 text-[10px] font-medium text-tone-blue-tx">
+                <Import size={10} /> Website
               </span>
             )}
             {isDuplicate && (
