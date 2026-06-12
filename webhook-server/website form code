@@ -1,4 +1,11 @@
-<!-- Paste this entire block into your innobuzz.in page (HTML block / custom HTML) -->
+<!-- Paste this ENTIRE block into innobuzz.in (Custom HTML). Replace old form completely. -->
+<!-- Site key from Google reCAPTCHA v3 admin (innobuzzCRM) -->
+<script
+  src="https://www.google.com/recaptcha/api.js?render=6Lek1xotAAAAAL2fINsFwqIl3BXQloDL4Vn-6VEQ"
+  async
+  defer
+></script>
+
 <style type="text/css">
   #custom_form_error {
     color: #ff6b6b;
@@ -67,38 +74,34 @@
 
 <script>
   (function () {
-    var RECAPTCHA_SITE_KEY = "6Lfb2RotAAAAAPzGSGx05HTXBns98R5dKHj_YXC-";
+    // Must match the site key in the script src above exactly
+    var RECAPTCHA_SITE_KEY = "6Lek1xotAAAAAL2fINsFwqIl3BXQloDL4Vn-6VEQ";
     var CRM_WEBSITE_LEAD_URL =
       "https://crm-production-be3b.up.railway.app/website-lead";
 
-    function loadRecaptcha(siteKey) {
+    function waitForRecaptcha(maxMs) {
       return new Promise(function (resolve, reject) {
-        if (window.grecaptcha) {
-          resolve();
-          return;
-        }
-        var s = document.createElement("script");
-        s.src =
-          "https://www.google.com/recaptcha/api.js?render=" +
-          encodeURIComponent(siteKey);
-        s.async = true;
-        s.onload = function () {
-          resolve();
-        };
-        s.onerror = function () {
-          reject(new Error("Failed to load reCAPTCHA"));
-        };
-        document.head.appendChild(s);
+        var start = Date.now();
+        (function tick() {
+          if (window.grecaptcha && window.grecaptcha.execute) {
+            resolve();
+            return;
+          }
+          if (Date.now() - start > maxMs) {
+            reject(new Error("reCAPTCHA script did not load"));
+            return;
+          }
+          setTimeout(tick, 100);
+        })();
       });
     }
 
     function getRecaptchaToken(siteKey) {
-      return new Promise(function (resolve, reject) {
-        grecaptcha.ready(function () {
-          grecaptcha
-            .execute(siteKey, { action: "book_trial" })
-            .then(resolve)
-            .catch(reject);
+      return waitForRecaptcha(10000).then(function () {
+        return new Promise(function (resolve, reject) {
+          grecaptcha.ready(function () {
+            grecaptcha.execute(siteKey, { action: "book_trial" }).then(resolve).catch(reject);
+          });
         });
       });
     }
@@ -109,8 +112,9 @@
       var errorDiv = document.getElementById("custom_form_error");
       var submitBtn = document.getElementById("input_submit");
 
-      loadRecaptcha(RECAPTCHA_SITE_KEY).catch(function () {
-        errorDiv.textContent = "Could not load security check. Please refresh.";
+      waitForRecaptcha(8000).catch(function () {
+        errorDiv.textContent =
+          "Could not load security check. Check site key and refresh.";
       });
 
       form.addEventListener("submit", function (e) {
@@ -158,7 +162,10 @@
           })
           .catch(function (err) {
             console.error("Error:", err);
-            errorDiv.textContent = "Network error. Please try again.";
+            errorDiv.textContent =
+              err.message === "reCAPTCHA script did not load"
+                ? "Could not load security check. Please refresh."
+                : "Network error. Please try again.";
           })
           .finally(function () {
             submitBtn.disabled = false;
