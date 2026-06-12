@@ -479,9 +479,19 @@ app.post('/leads', async (req, res) => {
   }
 });
 
-app.post('/website-lead', async (req, res) => {
+async function handleWebsiteLead(req, res) {
   try {
-    const phone = String(req.body?.phone || '').trim();
+    const body = req.body || {};
+    const phone = String(body.phone || body.mobile || body.contact_number || '').trim();
+    const name = String(body.name || body.full_name || '').trim();
+    const email = String(body.email || '').trim();
+    const city = String(body.city || '').trim();
+    const qualification = String(
+      body.qualification || body.course || 'Book Trial - Website',
+    ).trim();
+    const message = String(
+      body.message || body.inquiry || body.comment || body.notes || '',
+    ).trim();
 
     if (!phone) {
       return res.status(400).json({
@@ -498,15 +508,29 @@ app.post('/website-lead', async (req, res) => {
       });
     }
 
-    const lead = await Lead.create({
-      name: 'Website Lead',
+    const leadData = {
+      name: name || 'Website Lead',
       phone,
+      email,
+      city,
+      qualification,
       source: 'website',
       status: 'not_picked',
-      qualification: 'Book Trial - Website',
-    });
+    };
 
-    console.log('✅ Website lead created:', lead.phone);
+    if (message) {
+      leadData.callHistory = [
+        {
+          note: message,
+          statusAtTime: 'not_picked',
+          timestamp: new Date(),
+        },
+      ];
+    }
+
+    const lead = await Lead.create(leadData);
+
+    console.log('✅ Website lead created:', lead.phone, lead.name);
     res.json({
       success: true,
       message: 'Thank you! We will contact you shortly.',
@@ -519,7 +543,10 @@ app.post('/website-lead', async (req, res) => {
       message: err.message || 'Something went wrong. Please try again.',
     });
   }
-});
+}
+
+app.post('/website-lead', handleWebsiteLead);
+app.post('/api/v1/website/submit', handleWebsiteLead);
 
 app.put('/leads/:id', async (req, res) => {
   try {
@@ -740,7 +767,7 @@ const hasDashboard = fs.existsSync(indexHtml);
 
 if (hasDashboard) {
   app.use(express.static(distPath, { index: 'index.html' }));
-  app.get(/^\/(?!webhook|health|leads|test-lead|migrate-leads|sync-facebook|website-lead).*/, (_req, res) => {
+  app.get(/^\/(?!webhook|health|leads|test-lead|migrate-leads|sync-facebook|website-lead|api).*/, (_req, res) => {
     res.sendFile(indexHtml);
   });
 } else {

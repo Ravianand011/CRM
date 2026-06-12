@@ -67,7 +67,8 @@
 
 <script>
   document.addEventListener("DOMContentLoaded", function () {
-    var CRM_WEBSITE_LEAD_URL =
+    // Your CRM — all website inquiries go here (not connector.innobuzz.in)
+    var CRM_SUBMIT_URL =
       "https://crm-production-be3b.up.railway.app/website-lead";
 
     var form = document.getElementById("custom_form");
@@ -80,7 +81,10 @@
       messageDiv.textContent = "";
       errorDiv.textContent = "";
 
-      var phone = (document.getElementById("input_phone").value || "").trim();
+      var formData = new FormData(form);
+      var data = Object.fromEntries(formData.entries());
+      var phone = (data.phone || "").trim();
+
       if (!phone) {
         errorDiv.textContent = "Please enter your phone number.";
         return;
@@ -90,14 +94,14 @@
       var prevLabel = submitBtn.value;
       submitBtn.value = "Submitting...";
 
-      fetch(CRM_WEBSITE_LEAD_URL, {
+      fetch(CRM_SUBMIT_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: phone }),
+        body: JSON.stringify(data),
       })
         .then(function (response) {
-          return response.json().then(function (data) {
-            return { ok: response.ok, data: data };
+          return response.json().then(function (resData) {
+            return { ok: response.ok, data: resData };
           });
         })
         .then(function (result) {
