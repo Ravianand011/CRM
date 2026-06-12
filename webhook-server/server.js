@@ -104,25 +104,6 @@ async function findDuplicateByPhone(phone) {
   return matches.find((l) => normalizePhone(l.phone) === phoneKey) || null;
 }
 
-async function verifyRecaptcha(token, remoteIp) {
-  const secret = process.env.RECAPTCHA_SECRET_KEY?.trim();
-  if (!secret) {
-    throw new Error('RECAPTCHA_SECRET_KEY not set in Railway variables');
-  }
-
-  const params = new URLSearchParams();
-  params.set('secret', secret);
-  params.set('response', token);
-  if (remoteIp) params.set('remoteip', remoteIp);
-
-  const res = await fetch('https://www.google.com/recaptcha/api/siteverify', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: params.toString(),
-  });
-  return res.json();
-}
-
 function flattenFieldData(fieldData) {
   const result = {};
   if (!Array.isArray(fieldData)) return result;
@@ -501,41 +482,11 @@ app.post('/leads', async (req, res) => {
 app.post('/website-lead', async (req, res) => {
   try {
     const phone = String(req.body?.phone || '').trim();
-    const recaptchaToken = req.body?.recaptchaToken || req.body?.recaptcha_token;
 
     if (!phone) {
       return res.status(400).json({
         success: false,
         message: 'Please enter your phone number.',
-      });
-    }
-
-    if (!recaptchaToken) {
-      return res.status(400).json({
-        success: false,
-        message: 'CAPTCHA verification required. Please refresh and try again.',
-      });
-    }
-
-    const captcha = await verifyRecaptcha(
-      recaptchaToken,
-      req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip,
-    );
-
-    if (!captcha.success) {
-      console.log('❌ reCAPTCHA failed:', captcha['error-codes']);
-      return res.status(400).json({
-        success: false,
-        message: 'CAPTCHA verification failed. Please try again.',
-      });
-    }
-
-    const minScore = parseFloat(process.env.RECAPTCHA_MIN_SCORE || '0.5');
-    if (typeof captcha.score === 'number' && captcha.score < minScore) {
-      console.log('❌ reCAPTCHA low score:', captcha.score);
-      return res.status(400).json({
-        success: false,
-        message: 'Could not verify submission. Please try again.',
       });
     }
 
@@ -805,6 +756,5 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('🔑 VERIFY_TOKEN set:', !!process.env.VERIFY_TOKEN);
   console.log('📘 FB_PAGE_ACCESS_TOKEN set:', !!process.env.FB_PAGE_ACCESS_TOKEN);
   console.log('📅 FB sync from:', process.env.FB_SYNC_FROM || DEFAULT_SYNC_FROM);
-  console.log('🛡️ RECAPTCHA_SECRET_KEY set:', !!process.env.RECAPTCHA_SECRET_KEY);
   if (hasDashboard) console.log('CRM dashboard served from /dist');
 });

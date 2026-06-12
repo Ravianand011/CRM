@@ -1,11 +1,4 @@
 <!-- Paste this ENTIRE block into innobuzz.in (Custom HTML). Replace old form completely. -->
-<!-- Site key from Google reCAPTCHA v3 admin (innobuzzCRM) -->
-<script
-  src="https://www.google.com/recaptcha/api.js?render=6Lek1xotAAAAAL2fINsFwqIl3BXQloDL4Vn-6VEQ"
-  async
-  defer
-></script>
-
 <style type="text/css">
   #custom_form_error {
     color: #ff6b6b;
@@ -73,105 +66,60 @@
 </div>
 
 <script>
-  (function () {
-    // Must match the site key in the script src above exactly
-    var RECAPTCHA_SITE_KEY = "6Lek1xotAAAAAL2fINsFwqIl3BXQloDL4Vn-6VEQ";
+  document.addEventListener("DOMContentLoaded", function () {
     var CRM_WEBSITE_LEAD_URL =
       "https://crm-production-be3b.up.railway.app/website-lead";
 
-    function waitForRecaptcha(maxMs) {
-      return new Promise(function (resolve, reject) {
-        var start = Date.now();
-        (function tick() {
-          if (window.grecaptcha && window.grecaptcha.execute) {
-            resolve();
-            return;
-          }
-          if (Date.now() - start > maxMs) {
-            reject(new Error("reCAPTCHA script did not load"));
-            return;
-          }
-          setTimeout(tick, 100);
-        })();
-      });
-    }
+    var form = document.getElementById("custom_form");
+    var messageDiv = document.getElementById("custom_form_message");
+    var errorDiv = document.getElementById("custom_form_error");
+    var submitBtn = document.getElementById("input_submit");
 
-    function getRecaptchaToken(siteKey) {
-      return waitForRecaptcha(10000).then(function () {
-        return new Promise(function (resolve, reject) {
-          grecaptcha.ready(function () {
-            grecaptcha.execute(siteKey, { action: "book_trial" }).then(resolve).catch(reject);
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      messageDiv.textContent = "";
+      errorDiv.textContent = "";
+
+      var phone = (document.getElementById("input_phone").value || "").trim();
+      if (!phone) {
+        errorDiv.textContent = "Please enter your phone number.";
+        return;
+      }
+
+      submitBtn.disabled = true;
+      var prevLabel = submitBtn.value;
+      submitBtn.value = "Submitting...";
+
+      fetch(CRM_WEBSITE_LEAD_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: phone }),
+      })
+        .then(function (response) {
+          return response.json().then(function (data) {
+            return { ok: response.ok, data: data };
           });
-        });
-      });
-    }
-
-    document.addEventListener("DOMContentLoaded", function () {
-      var form = document.getElementById("custom_form");
-      var messageDiv = document.getElementById("custom_form_message");
-      var errorDiv = document.getElementById("custom_form_error");
-      var submitBtn = document.getElementById("input_submit");
-
-      waitForRecaptcha(8000).catch(function () {
-        errorDiv.textContent =
-          "Could not load security check. Check site key and refresh.";
-      });
-
-      form.addEventListener("submit", function (e) {
-        e.preventDefault();
-        messageDiv.textContent = "";
-        errorDiv.textContent = "";
-
-        var phone = (document.getElementById("input_phone").value || "").trim();
-        if (!phone) {
-          errorDiv.textContent = "Please enter your phone number.";
-          return;
-        }
-
-        submitBtn.disabled = true;
-        var prevLabel = submitBtn.value;
-        submitBtn.value = "Submitting...";
-
-        getRecaptchaToken(RECAPTCHA_SITE_KEY)
-          .then(function (recaptchaToken) {
-            return fetch(CRM_WEBSITE_LEAD_URL, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                phone: phone,
-                recaptchaToken: recaptchaToken,
-              }),
-            });
-          })
-          .then(function (response) {
-            return response.json().then(function (data) {
-              return { ok: response.ok, data: data };
-            });
-          })
-          .then(function (result) {
-            if (result.ok && result.data.success !== false) {
-              messageDiv.textContent =
-                result.data.message || "Form submitted successfully!";
-              form.reset();
-            } else {
-              errorDiv.textContent =
-                result.data.message ||
-                result.data.error ||
-                "Something went wrong!";
-            }
-          })
-          .catch(function (err) {
-            console.error("Error:", err);
+        })
+        .then(function (result) {
+          if (result.ok && result.data.success !== false) {
+            messageDiv.textContent =
+              result.data.message || "Form submitted successfully!";
+            form.reset();
+          } else {
             errorDiv.textContent =
-              err.message === "reCAPTCHA script did not load"
-                ? "Could not load security check. Please refresh."
-                : "Network error. Please try again.";
-          })
-          .finally(function () {
-            submitBtn.disabled = false;
-            submitBtn.value = prevLabel;
-          });
-      });
+              result.data.message ||
+              result.data.error ||
+              "Something went wrong!";
+          }
+        })
+        .catch(function (err) {
+          console.error("Error:", err);
+          errorDiv.textContent = "Network error. Please try again.";
+        })
+        .finally(function () {
+          submitBtn.disabled = false;
+          submitBtn.value = prevLabel;
+        });
     });
-  })();
+  });
 </script>
